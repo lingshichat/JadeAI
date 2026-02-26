@@ -67,8 +67,9 @@ export async function GET(
         });
       }
       case 'pdf': {
+        const fitOnePage = request.nextUrl.searchParams.get('fitOnePage') === 'true';
         const pdfHtml = generateHtml(resume, true);
-        const pdfBuffer = await generatePdf(pdfHtml);
+        const pdfBuffer = await generatePdf(pdfHtml, { fitOnePage });
         return new NextResponse(new Uint8Array(pdfBuffer), {
           status: 200,
           headers: {

@@ -68,13 +68,15 @@ Build professional resumes with drag-and-drop editing, real-time AI optimization
 
 ### Export & Sharing
 
-- **Multi-Format Export** — PDF (Puppeteer + Chromium), DOCX, HTML, TXT, JSON
+- **Multi-Format Export** — PDF (Puppeteer + Chromium), Smart One-Page PDF (auto-fit to single page), DOCX, HTML, TXT, JSON
+- **JSON Import** — Import a previously exported JSON file to restore or create a resume; supported both in the editor (overwrite current) and on the dashboard (create new)
 - **Link Sharing** — Token-based shareable links with optional password protection
 - **View Counter** — Track how many times a shared resume has been viewed
 
 ### Management
 
 - **Multi-Resume Dashboard** — Grid and list views, search, sort (by date, name)
+- **Import from JSON** — Create a new resume from a JSON export directly on the dashboard
 - **Duplicate & Rename** — Quick resume management actions
 - **Interactive Tours** — Step-by-step onboarding for first-time users
 

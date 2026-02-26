@@ -95,6 +95,17 @@ export function buildExportThemeCSS(theme: typeof DEFAULT_THEME, template: strin
       font-family: ${theme.fontFamily}, sans-serif !important;
       line-height: ${theme.lineSpacing} !important;
       ${needsPadding ? `padding: ${m.top}px ${m.right}px ${m.bottom}px ${m.left}px !important;` : ''}
+      --base-body-size: ${fs.body};
+      --base-h1-size: ${fs.h1};
+      --base-h2-size: ${fs.h2};
+      --base-h3-size: ${fs.h3};
+      --base-line-spacing: ${theme.lineSpacing};
+      --base-section-spacing: ${theme.sectionSpacing}px;
+      --base-margin-top: ${m.top}px;
+      --base-margin-right: ${m.right}px;
+      --base-margin-bottom: ${m.bottom}px;
+      --base-margin-left: ${m.left}px;
+      --needs-padding: ${needsPadding ? '1' : '0'};
     }
     ${sel} p, ${sel} li, ${sel} span:not(.shrink-0), ${sel} td, ${sel} a {
       font-size: ${fs.body} !important;

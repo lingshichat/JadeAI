@@ -28,39 +28,56 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { title, template, language } = body;
+    const { title, template, language, sections, themeConfig } = body;
 
     const resume = await resumeRepository.create({
       userId: user.id,
       title: title || '未命名简历',
       template: template || 'classic',
       language: language || 'zh',
+      ...(themeConfig ? { themeConfig } : {}),
     });
 
     if (resume) {
-      const lang = resume.language || 'zh';
-      for (let i = 0; i < DEFAULT_SECTIONS.length; i++) {
-        const s = DEFAULT_SECTIONS[i];
-        const sectionTitle = lang === 'en' ? s.titleEn : s.titleZh;
-        let content: unknown = {};
-
-        if (s.type === 'personal_info') {
-          content = { fullName: '', jobTitle: '', email: '', phone: '', location: '' };
-        } else if (s.type === 'summary') {
-          content = { text: '' };
-        } else if (s.type === 'work_experience' || s.type === 'education' || s.type === 'projects' || s.type === 'certifications' || s.type === 'languages' || s.type === 'custom') {
-          content = { items: [] };
-        } else if (s.type === 'skills') {
-          content = { categories: [] };
+      if (Array.isArray(sections) && sections.length > 0) {
+        // Import mode: use provided sections, ignore original ids
+        for (let i = 0; i < sections.length; i++) {
+          const s = sections[i];
+          await resumeRepository.createSection({
+            resumeId: resume.id,
+            type: s.type,
+            title: s.title,
+            sortOrder: i,
+            visible: s.visible,
+            content: s.content,
+          });
         }
+      } else {
+        // Default mode: create empty sections
+        const lang = resume.language || 'zh';
+        for (let i = 0; i < DEFAULT_SECTIONS.length; i++) {
+          const s = DEFAULT_SECTIONS[i];
+          const sectionTitle = lang === 'en' ? s.titleEn : s.titleZh;
+          let content: unknown = {};
 
-        await resumeRepository.createSection({
-          resumeId: resume.id,
-          type: s.type,
-          title: sectionTitle,
-          sortOrder: i,
-          content,
-        });
+          if (s.type === 'personal_info') {
+            content = { fullName: '', jobTitle: '', email: '', phone: '', location: '' };
+          } else if (s.type === 'summary') {
+            content = { text: '' };
+          } else if (s.type === 'work_experience' || s.type === 'education' || s.type === 'projects' || s.type === 'certifications' || s.type === 'languages' || s.type === 'custom') {
+            content = { items: [] };
+          } else if (s.type === 'skills') {
+            content = { categories: [] };
+          }
+
+          await resumeRepository.createSection({
+            resumeId: resume.id,
+            type: s.type,
+            title: sectionTitle,
+            sortOrder: i,
+            content,
+          });
+        }
       }
 
       const fullResume = await resumeRepository.findById(resume.id);

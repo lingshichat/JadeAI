@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
-import { Plus, Search, LayoutGrid, List, Sparkles } from 'lucide-react';
+import { Plus, Search, LayoutGrid, List, Sparkles, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -21,6 +21,7 @@ import { ResumeGrid } from '@/components/dashboard/resume-grid';
 import { ResumeListItem } from '@/components/dashboard/resume-list-item';
 import { CreateResumeDialog } from '@/components/dashboard/create-resume-dialog';
 import { GenerateResumeDialog } from '@/components/dashboard/generate-resume-dialog';
+import { ImportJsonDialog } from '@/components/dashboard/import-json-dialog';
 import { ShareDialog } from '@/components/editor/share-dialog';
 import { SettingsDialog } from '@/components/settings/settings-dialog';
 import { TourOverlay, type TourStepConfig } from '@/components/tour/tour-overlay';
@@ -149,6 +150,14 @@ export default function DashboardPage() {
             {t('aiGenerate')}
           </Button>
           <Button
+            variant="outline"
+            onClick={() => openModal('import')}
+            className="cursor-pointer gap-2"
+          >
+            <Upload className="h-4 w-4" />
+            {t('importJson')}
+          </Button>
+          <Button
             data-tour="dash-create"
             onClick={() => openModal('create-resume')}
             className="cursor-pointer gap-2 bg-pink-500 hover:bg-pink-600"
@@ -274,6 +283,10 @@ export default function DashboardPage() {
         open={activeModal === 'generate-resume'}
         onOpenChange={(open) => open ? openModal('generate-resume') : closeModal()}
         onCreated={fetchResumes}
+      />
+      <ImportJsonDialog
+        open={activeModal === 'import'}
+        onOpenChange={(open) => open ? openModal('import') : closeModal()}
       />
       <SettingsDialog />
       {shareResumeId && (

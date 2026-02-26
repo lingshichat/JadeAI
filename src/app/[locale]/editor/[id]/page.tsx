@@ -13,6 +13,7 @@ import { SettingsDialog } from '@/components/settings/settings-dialog';
 import { JdAnalysisDialog } from '@/components/editor/jd-analysis-dialog';
 import { TranslateDialog } from '@/components/editor/translate-dialog';
 import { ExportDialog } from '@/components/editor/export-dialog';
+import { ImportDialog } from '@/components/editor/import-dialog';
 import { ShareDialog } from '@/components/editor/share-dialog';
 import { CoverLetterDialog } from '@/components/editor/cover-letter-dialog';
 import { GrammarCheckDialog } from '@/components/editor/grammar-check-dialog';
@@ -97,6 +98,11 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
       <ExportDialog
         open={activeModal === 'export'}
         onOpenChange={(open) => open ? openModal('export') : closeModal()}
+        resumeId={id}
+      />
+      <ImportDialog
+        open={activeModal === 'import'}
+        onOpenChange={(open) => open ? openModal('import') : closeModal()}
         resumeId={id}
       />
       <ShareDialog

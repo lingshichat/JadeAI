@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useResumeStore } from '@/stores/resume-store';
 import {
   FileDown,
@@ -18,6 +19,7 @@ import {
   Globe,
   AlignLeft,
   Braces,
+  Sparkles,
   Loader2,
   CheckCircle2,
   AlertCircle,
@@ -29,7 +31,7 @@ interface ExportDialogProps {
   resumeId: string;
 }
 
-type ExportFormat = 'pdf' | 'docx' | 'html' | 'txt' | 'json';
+type ExportFormat = 'pdf' | 'pdf-one-page' | 'docx' | 'html' | 'txt' | 'json';
 type ExportState = 'idle' | 'exporting' | 'success' | 'error';
 
 const FORMAT_OPTIONS: {
@@ -37,8 +39,10 @@ const FORMAT_OPTIONS: {
   icon: typeof FileDown;
   labelKey: string;
   descKey: string;
+  tooltipKey?: string;
 }[] = [
   { value: 'pdf', icon: FileDown, labelKey: 'pdf', descKey: 'pdfDescription' },
+  { value: 'pdf-one-page', icon: Sparkles, labelKey: 'pdfOnePage', descKey: 'pdfOnePageDescription', tooltipKey: 'pdfOnePageTooltip' },
   { value: 'docx', icon: FileText, labelKey: 'docx', descKey: 'docxDescription' },
   { value: 'html', icon: Globe, labelKey: 'html', descKey: 'htmlDescription' },
   { value: 'txt', icon: AlignLeft, labelKey: 'txt', descKey: 'txtDescription' },
@@ -70,7 +74,9 @@ export function ExportDialog({ open, onOpenChange, resumeId }: ExportDialogProps
       if (isDirty) await save();
 
       const fingerprint = localStorage.getItem('jade_fingerprint');
-      const res = await fetch(`/api/resume/${resumeId}/export?format=${selectedFormat}`, {
+      const queryFormat = selectedFormat === 'pdf-one-page' ? 'pdf' : selectedFormat;
+      const fitParam = selectedFormat === 'pdf-one-page' ? '&fitOnePage=true' : '';
+      const res = await fetch(`/api/resume/${resumeId}/export?format=${queryFormat}${fitParam}`, {
         headers: {
           ...(fingerprint ? { 'x-fingerprint': fingerprint } : {}),
         },
@@ -89,12 +95,13 @@ export function ExportDialog({ open, onOpenChange, resumeId }: ExportDialogProps
       const title = currentResume?.title || 'resume';
       const now = new Date();
       const ts = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
-      const extMap: Record<string, string> = {
-        pdf: 'pdf',
-        docx: 'docx',
-        html: 'html',
-        txt: 'txt',
-        json: 'json',
+      const extMap: Record<ExportFormat, string> = {
+        'pdf': 'pdf',
+        'pdf-one-page': 'pdf',
+        'docx': 'docx',
+        'html': 'html',
+        'txt': 'txt',
+        'json': 'json',
       };
       a.download = `${title}-${ts}.${extMap[selectedFormat]}`;
       document.body.appendChild(a);
@@ -125,31 +132,44 @@ export function ExportDialog({ open, onOpenChange, resumeId }: ExportDialogProps
 
         <div className="px-6 py-5">
           {state === 'idle' && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {FORMAT_OPTIONS.map((format) => {
-                const Icon = format.icon;
-                const isSelected = selectedFormat === format.value;
-                return (
-                  <button
-                    key={format.value}
-                    onClick={() => setSelectedFormat(format.value)}
-                    className={`cursor-pointer flex flex-col items-center gap-2 rounded-lg border-2 p-4 text-center transition-all duration-150 hover:border-pink-300 hover:bg-pink-50/50 dark:hover:border-pink-700 dark:hover:bg-pink-950/20 ${
-                      isSelected
-                        ? 'border-pink-500 bg-pink-50 dark:border-pink-500 dark:bg-pink-950/30'
-                        : 'border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900'
-                    }`}
-                  >
-                    <Icon className={`h-6 w-6 ${isSelected ? 'text-pink-500' : 'text-zinc-500 dark:text-zinc-400'}`} />
-                    <span className={`text-sm font-medium ${isSelected ? 'text-pink-600 dark:text-pink-400' : 'text-zinc-700 dark:text-zinc-300'}`}>
-                      {t(format.labelKey)}
-                    </span>
-                    <span className="text-xs text-zinc-400 dark:text-zinc-500">
-                      {t(format.descKey)}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+            <TooltipProvider>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {FORMAT_OPTIONS.map((format) => {
+                  const Icon = format.icon;
+                  const isSelected = selectedFormat === format.value;
+                  const card = (
+                    <button
+                      key={format.value}
+                      onClick={() => setSelectedFormat(format.value)}
+                      className={`cursor-pointer flex flex-col items-center gap-2 rounded-lg border-2 p-4 text-center transition-all duration-150 hover:border-pink-300 hover:bg-pink-50/50 dark:hover:border-pink-700 dark:hover:bg-pink-950/20 ${
+                        isSelected
+                          ? 'border-pink-500 bg-pink-50 dark:border-pink-500 dark:bg-pink-950/30'
+                          : 'border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900'
+                      }`}
+                    >
+                      <Icon className={`h-6 w-6 ${isSelected ? 'text-pink-500' : 'text-zinc-500 dark:text-zinc-400'}`} />
+                      <span className={`text-sm font-medium ${isSelected ? 'text-pink-600 dark:text-pink-400' : 'text-zinc-700 dark:text-zinc-300'}`}>
+                        {t(format.labelKey)}
+                      </span>
+                      <span className="text-xs text-zinc-400 dark:text-zinc-500">
+                        {t(format.descKey)}
+                      </span>
+                    </button>
+                  );
+                  if (format.tooltipKey) {
+                    return (
+                      <Tooltip key={format.value}>
+                        <TooltipTrigger asChild>{card}</TooltipTrigger>
+                        <TooltipContent side="bottom" sideOffset={6}>
+                          {t(format.tooltipKey)}
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  }
+                  return card;
+                })}
+              </div>
+            </TooltipProvider>
           )}
 
           {state === 'exporting' && (

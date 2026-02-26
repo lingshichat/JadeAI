@@ -315,7 +315,7 @@ export function ThemeEditor({ onClose }: ThemeEditorProps) {
         </Button>
       </div>
 
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 min-h-0">
         <div className="px-4 py-3 space-y-1">
           {/* Template Switcher */}
           <ThemeSection icon={LayoutGrid} title={t('templateSection')} defaultOpen={false}>

@@ -1,16 +1,10 @@
 'use client';
 
-import { useMemo } from 'react';
-import { CalendarDays } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { useTranslations } from 'next-intl';
+import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 
 interface EditableDateProps {
   label: string;
@@ -18,26 +12,11 @@ interface EditableDateProps {
   onChange: (value: string) => void;
 }
 
-const MONTHS = [
-  '01', '02', '03', '04', '05', '06',
-  '07', '08', '09', '10', '11', '12',
-];
-
-const MONTH_LABELS: Record<string, string> = {
-  '01': '1月', '02': '2月', '03': '3月', '04': '4月',
-  '05': '5月', '06': '6月', '07': '7月', '08': '8月',
-  '09': '9月', '10': '10月', '11': '11月', '12': '12月',
-};
+const MONTHS = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'] as const;
 
 export function EditableDate({ label, value, onChange }: EditableDateProps) {
-  const currentYear = new Date().getFullYear();
-  const years = useMemo(() => {
-    const arr: string[] = [];
-    for (let y = currentYear + 5; y >= currentYear - 50; y--) {
-      arr.push(String(y));
-    }
-    return arr;
-  }, [currentYear]);
+  const t = useTranslations('editor.fields');
+  const [open, setOpen] = useState(false);
 
   const [selectedYear, selectedMonth] = useMemo(() => {
     if (!value) return ['', ''];
@@ -45,29 +24,34 @@ export function EditableDate({ label, value, onChange }: EditableDateProps) {
     return [parts[0] || '', parts[1] || ''];
   }, [value]);
 
+  const [browseYear, setBrowseYear] = useState(() => {
+    return selectedYear ? Number(selectedYear) : new Date().getFullYear();
+  });
+
   const displayText = useMemo(() => {
     if (!selectedYear || !selectedMonth) return '';
-    return `${selectedYear}年${MONTH_LABELS[selectedMonth] || selectedMonth}`;
-  }, [selectedYear, selectedMonth]);
+    return t('dateDisplay', { year: selectedYear, month: t(`months.${selectedMonth}` as any) });
+  }, [selectedYear, selectedMonth, t]);
 
-  const handleYearChange = (year: string) => {
-    const month = selectedMonth || '01';
-    onChange(`${year}-${month}`);
-  };
-
-  const handleMonthChange = (month: string) => {
-    const year = selectedYear || String(currentYear);
-    onChange(`${year}-${month}`);
+  const handleMonthClick = (month: string) => {
+    onChange(`${browseYear}-${month}`);
+    setOpen(false);
   };
 
   const handleClear = () => {
     onChange('');
+    setOpen(false);
   };
 
   return (
     <div className="space-y-1">
       <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{label}</label>
-      <Popover>
+      <Popover open={open} onOpenChange={(v) => {
+        setOpen(v);
+        if (v) {
+          setBrowseYear(selectedYear ? Number(selectedYear) : new Date().getFullYear());
+        }
+      }}>
         <PopoverTrigger asChild>
           <Button
             variant="outline"
@@ -82,31 +66,51 @@ export function EditableDate({ label, value, onChange }: EditableDateProps) {
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-56 p-3" align="start">
-          <div className="space-y-2">
-            <Select value={selectedYear} onValueChange={handleYearChange}>
-              <SelectTrigger className="h-8 text-sm">
-                <SelectValue placeholder="年份" />
-              </SelectTrigger>
-              <SelectContent className="max-h-48">
-                {years.map((y) => (
-                  <SelectItem key={y} value={y}>
-                    {y}年
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={selectedMonth} onValueChange={handleMonthChange}>
-              <SelectTrigger className="h-8 text-sm">
-                <SelectValue placeholder="月份" />
-              </SelectTrigger>
-              <SelectContent>
-                {MONTHS.map((m) => (
-                  <SelectItem key={m} value={m}>
-                    {MONTH_LABELS[m]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="space-y-3">
+            {/* Year navigation */}
+            <div className="flex items-center justify-between">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 cursor-pointer p-0"
+                onClick={() => setBrowseYear((y) => y - 1)}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm font-medium">{browseYear}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 cursor-pointer p-0"
+                onClick={() => setBrowseYear((y) => y + 1)}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Month grid 4×3 */}
+            <div className="grid grid-cols-4 gap-1">
+              {MONTHS.map((m) => {
+                const isSelected = selectedYear === String(browseYear) && selectedMonth === m;
+                return (
+                  <Button
+                    key={m}
+                    variant="ghost"
+                    size="sm"
+                    className={`h-8 cursor-pointer text-xs ${
+                      isSelected
+                        ? 'bg-pink-100 text-pink-700 hover:bg-pink-200 dark:bg-pink-900/30 dark:text-pink-300 dark:hover:bg-pink-900/50'
+                        : ''
+                    }`}
+                    onClick={() => handleMonthClick(m)}
+                  >
+                    {t(`months.${m}` as any)}
+                  </Button>
+                );
+              })}
+            </div>
+
+            {/* Clear button */}
             {value && (
               <Button
                 variant="ghost"
@@ -114,7 +118,7 @@ export function EditableDate({ label, value, onChange }: EditableDateProps) {
                 className="h-7 w-full cursor-pointer text-xs text-zinc-400"
                 onClick={handleClear}
               >
-                清除
+                {t('clear')}
               </Button>
             )}
           </div>

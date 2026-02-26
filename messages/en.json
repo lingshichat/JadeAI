@@ -49,6 +49,7 @@
     "templateCreative": "Creative",
     "templateAts": "ATS",
     "aiGenerate": "AI Generate",
+    "importJson": "Import JSON",
     "templateAcademic": "Academic",
     "templateElegant": "Elegant",
     "templateExecutive": "Executive",
@@ -124,7 +125,8 @@
       "translate": "Translate",
       "coverLetter": "Cover Letter",
       "grammarCheck": "Grammar",
-      "share": "Share"
+      "share": "Share",
+      "import": "Import"
     },
     "aiPolish": "AI Polish",
     "sidebar": {
@@ -167,7 +169,14 @@
       "language": "Language",
       "proficiency": "Proficiency",
       "addItem": "Add Item",
-      "removeItem": "Remove Item"
+      "removeItem": "Remove Item",
+      "clear": "Clear",
+      "dateDisplay": "{month} {year}",
+      "months": {
+        "01": "Jan", "02": "Feb", "03": "Mar", "04": "Apr",
+        "05": "May", "06": "Jun", "07": "Jul", "08": "Aug",
+        "09": "Sep", "10": "Oct", "11": "Nov", "12": "Dec"
+      }
     }
   },
   "ai": {
@@ -391,12 +400,28 @@
     "htmlDescription": "Web page format",
     "txt": "Plain Text",
     "txtDescription": "Simple text file",
+    "pdfOnePage": "Smart One-Page",
+    "pdfOnePageDescription": "Auto-fit to one page",
+    "pdfOnePageTooltip": "Very long resumes may fail to fit on one page",
     "json": "JSON",
     "jsonDescription": "Structured data",
     "export": "Export",
     "exporting": "Exporting...",
     "success": "Export successful!",
     "error": "Export failed. Please try again.",
+    "cancel": "Cancel"
+  },
+  "import": {
+    "title": "Import Resume",
+    "description": "Import a previously exported JSON file to replace current content",
+    "dashboardDescription": "Import a previously exported JSON file to create a new resume",
+    "selectFile": "Click to select or drag a .json file here",
+    "dragHint": "Supports .json files exported from JadeAI",
+    "importing": "Importing...",
+    "success": "Import successful!",
+    "error": "Import failed. Please try again.",
+    "invalidFormat": "Invalid file format. Please select a valid JSON file with sections data.",
+    "importBtn": "Import",
     "cancel": "Cancel"
   },
   "pdfOptions": {
