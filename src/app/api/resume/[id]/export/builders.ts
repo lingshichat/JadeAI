@@ -142,12 +142,11 @@ export function generateHtml(resume: ResumeWithSections, forPdf = false): string
        html, body { background: ${isFullDark ? fullDarkBg : 'white'} !important; padding: 0 !important; margin: 0 !important; display: block !important; min-height: 100%; }
        .resume-export { width: 100%; }
        .resume-export > div { box-shadow: none !important; ${isBackground ? 'max-width: none !important; width: 100% !important;' : 'background: white !important;'} }
-       /* Smart pagination */
-       [data-section] { break-inside: avoid; }
+       /* Smart pagination: allow sections to break across pages, keep individual items together */
+       [data-section] { break-inside: auto; }
        .item, [data-section] > div > div { break-inside: avoid; }
        .rounded-lg, .border-l-2 { break-inside: avoid; }
        h2, h3 { break-after: avoid; }
-       ul, ol { break-inside: avoid; }
        p { orphans: 3; widows: 3; }
        ${isFullDark ? `/* Full-dark: simulate @page margin via content padding (can't use @page margin — it would be white) */
        .resume-export > div > *:last-child {
