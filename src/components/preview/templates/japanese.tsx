@@ -75,7 +75,7 @@ function JapaneseSectionContent({ section }: { section: any }) {
               <h3 className="text-sm font-normal" style={{ color: PRIMARY }}>{item.position}</h3>
               <span className="shrink-0 text-[10px] font-light" style={{ color: ACCENT }}>{item.startDate} &ndash; {item.current ? 'Present' : item.endDate}</span>
             </div>
-            {item.company && <p className="mt-0.5 text-xs font-light" style={{ color: ACCENT }}>{item.company}</p>}
+            {item.company && <p className="mt-0.5 text-xs font-light" style={{ color: ACCENT }}>{item.company}{item.location ? `, ${item.location}` : ''}</p>}
             {item.description && <p className="mt-2 text-sm font-light leading-relaxed" style={{ color: '#57534e' }}>{item.description}</p>}
             {item.highlights?.length > 0 && (
               <ul className="mt-2 space-y-1">
@@ -103,7 +103,7 @@ function JapaneseSectionContent({ section }: { section: any }) {
               <h3 className="text-sm font-normal" style={{ color: PRIMARY }}>{item.degree}{item.field ? ` in ${item.field}` : ''}</h3>
               <span className="shrink-0 text-[10px] font-light" style={{ color: ACCENT }}>{item.startDate} &ndash; {item.endDate}</span>
             </div>
-            {item.institution && <p className="mt-0.5 text-xs font-light" style={{ color: ACCENT }}>{item.institution}</p>}
+            {item.institution && <p className="mt-0.5 text-xs font-light" style={{ color: ACCENT }}>{item.institution}{item.location ? `, ${item.location}` : ''}</p>}
             {item.gpa && <p className="mt-1 text-xs font-light" style={{ color: ACCENT }}>GPA: {item.gpa}</p>}
             {item.highlights?.length > 0 && (
               <ul className="mt-2 space-y-1">

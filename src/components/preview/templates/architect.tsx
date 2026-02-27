@@ -96,6 +96,7 @@ function ArchitectSectionContent({ section }: { section: any }) {
               <div>
                 <span className="text-sm font-bold" style={{ color: PRIMARY }}>{item.position}</span>
                 {item.company && <span className="text-sm" style={{ color: ACCENT }}> | {item.company}</span>}
+                {item.location && <span className="text-sm" style={{ color: MUTED }}>, {item.location}</span>}
               </div>
               <span
                 className="shrink-0 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider"
@@ -132,6 +133,7 @@ function ArchitectSectionContent({ section }: { section: any }) {
                   {item.degree}{item.field ? ` in ${item.field}` : ''}
                 </span>
                 {item.institution && <span className="text-sm" style={{ color: MUTED }}> — {item.institution}</span>}
+                {item.location && <span className="text-sm" style={{ color: MUTED }}>, {item.location}</span>}
               </div>
               <span className="shrink-0 text-xs" style={{ fontFamily: 'JetBrains Mono, Consolas, monospace', color: MUTED }}>
                 {item.startDate} - {item.endDate}

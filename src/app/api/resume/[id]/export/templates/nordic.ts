@@ -33,6 +33,7 @@ function buildNordicSectionContent(section: Section): string {
     return `<div class="space-y-3">${((c as EducationContent).items || []).map((it: any) => `<div class="rounded-sm p-3" style="background-color:${SLATE_50}">
       <div class="flex items-baseline justify-between"><div><span class="text-sm font-medium" style="color:${SLATE_500}">${esc(it.degree)}${it.field ? ` in ${esc(it.field)}` : ''}</span>${it.institution ? `<span class="text-sm font-light" style="color:${SLATE_400}"> - ${esc(it.institution)}</span>` : ''}</div><span class="shrink-0 text-xs font-light" style="color:${SLATE_400}">${esc(it.startDate)} - ${esc(it.endDate)}</span></div>
       ${it.gpa ? `<p class="text-xs font-light" style="color:${SLATE_400}">GPA: ${esc(it.gpa)}</p>` : ''}
+      ${it.highlights?.length ? `<ul class="mt-1.5 list-disc pl-4">${it.highlights.filter(Boolean).map((h: string) => `<li class="text-sm font-light" style="color:${SLATE_500}">${esc(h)}</li>`).join('')}</ul>` : ''}
     </div>`).join('')}</div>`;
   }
 

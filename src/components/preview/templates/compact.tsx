@@ -101,6 +101,21 @@ function CompactLeftContent({ section }: { section: any }) {
     );
   }
 
+  if (section.type === 'custom') {
+    return (
+      <div className="space-y-1.5">
+        {((content as CustomContent).items || []).map((item: any) => (
+          <div key={item.id}>
+            <p className="text-[10px] font-semibold text-zinc-700">{item.title}</p>
+            {item.subtitle && <p className="text-[9px] text-zinc-500">{item.subtitle}</p>}
+            {item.date && <p className="text-[9px] text-zinc-400">{item.date}</p>}
+            {item.description && <p className="text-[9px] text-zinc-400">{item.description}</p>}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   if (content.items) {
     return (
       <div className="space-y-1">
@@ -133,6 +148,7 @@ function CompactRightContent({ section }: { section: any }) {
               <div>
                 <span className="text-xs font-bold text-zinc-800">{item.position}</span>
                 {item.company && <span className="text-xs text-zinc-500"> | {item.company}</span>}
+                {item.location && <span className="text-xs text-zinc-400">, {item.location}</span>}
               </div>
               <span className="shrink-0 text-[10px] text-zinc-400">{item.startDate} – {item.current ? 'Present' : item.endDate}</span>
             </div>
@@ -157,10 +173,16 @@ function CompactRightContent({ section }: { section: any }) {
               <div>
                 <span className="text-xs font-bold text-zinc-800">{item.degree}{item.field ? ` in ${item.field}` : ''}</span>
                 {item.institution && <span className="text-xs text-zinc-500"> — {item.institution}</span>}
+                {item.location && <span className="text-xs text-zinc-400">, {item.location}</span>}
               </div>
               <span className="shrink-0 text-[10px] text-zinc-400">{item.startDate} – {item.endDate}</span>
             </div>
             {item.gpa && <p className="text-[10px] text-zinc-500">GPA: {item.gpa}</p>}
+            {item.highlights?.length > 0 && (
+              <ul className="mt-0.5 list-disc pl-3.5">
+                {item.highlights.map((h: string, i: number) => <li key={i} className="text-xs text-zinc-600">{h}</li>)}
+              </ul>
+            )}
           </div>
         ))}
       </div>
@@ -177,6 +199,14 @@ function CompactRightContent({ section }: { section: any }) {
               {item.startDate && <span className="shrink-0 text-[10px] text-zinc-400">{item.startDate}{item.endDate ? ` – ${item.endDate}` : ''}</span>}
             </div>
             {item.description && <p className="mt-0.5 text-xs text-zinc-600">{item.description}</p>}
+            {item.technologies?.length > 0 && (
+              <p className="mt-0.5 text-[10px] text-zinc-400">Tech: {item.technologies.join(', ')}</p>
+            )}
+            {item.highlights?.length > 0 && (
+              <ul className="mt-0.5 list-disc pl-3.5">
+                {item.highlights.map((h: string, i: number) => <li key={i} className="text-xs text-zinc-600">{h}</li>)}
+              </ul>
+            )}
           </div>
         ))}
       </div>

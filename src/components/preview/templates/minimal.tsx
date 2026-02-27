@@ -1,6 +1,6 @@
 'use client';
 
-import type { Resume, PersonalInfoContent, SummaryContent, WorkExperienceContent, EducationContent, SkillsContent } from '@/types/resume';
+import type { Resume, PersonalInfoContent, SummaryContent, WorkExperienceContent, EducationContent, SkillsContent, ProjectsContent, CertificationsContent, LanguagesContent, CustomContent } from '@/types/resume';
 import { isSectionEmpty } from '../utils';
 
 export function MinimalTemplate({ resume }: { resume: Resume }) {
@@ -56,6 +56,13 @@ function MinimalSectionContent({ section }: { section: any }) {
             <p className="text-sm"><span className="font-medium text-zinc-800">{item.position}</span> {item.company && <span className="text-zinc-500">/ {item.company}</span>}</p>
             <p className="text-xs text-zinc-400">{item.startDate} - {item.current ? 'Present' : item.endDate}</p>
             {item.description && <p className="mt-1 text-sm text-zinc-600">{item.description}</p>}
+            {item.highlights?.length > 0 && (
+              <ul className="mt-1 list-disc pl-4">
+                {item.highlights.map((h: string, i: number) => (
+                  <li key={i} className="text-sm text-zinc-500">{h}</li>
+                ))}
+              </ul>
+            )}
           </div>
         ))}
       </div>
@@ -70,6 +77,14 @@ function MinimalSectionContent({ section }: { section: any }) {
             <p className="text-sm"><span className="font-medium text-zinc-800">{item.institution}</span></p>
             <p className="text-sm text-zinc-600">{item.degree} {item.field && `- ${item.field}`}</p>
             <p className="text-xs text-zinc-400">{item.startDate} - {item.endDate}</p>
+            {item.gpa && <p className="text-xs text-zinc-400">GPA: {item.gpa}</p>}
+            {item.highlights?.length > 0 && (
+              <ul className="mt-1 list-disc pl-4">
+                {item.highlights.map((h: string, i: number) => (
+                  <li key={i} className="text-sm text-zinc-500">{h}</li>
+                ))}
+              </ul>
+            )}
           </div>
         ))}
       </div>
@@ -81,6 +96,84 @@ function MinimalSectionContent({ section }: { section: any }) {
       <div className="space-y-1">
         {(content.categories || []).map((cat: any) => (
           <p key={cat.id} className="text-sm text-zinc-600">{cat.skills?.join(' / ')}</p>
+        ))}
+      </div>
+    );
+  }
+
+  if (section.type === 'projects') {
+    const items = (content as ProjectsContent).items || [];
+    return (
+      <div className="space-y-4">
+        {items.map((item: any) => (
+          <div key={item.id}>
+            <div className="flex items-baseline justify-between">
+              <span className="text-sm font-medium text-zinc-800">{item.name}</span>
+              {item.startDate && <span className="text-xs text-zinc-400">{item.startDate}{item.endDate ? ` - ${item.endDate}` : ''}</span>}
+            </div>
+            {item.description && <p className="mt-1 text-sm text-zinc-600">{item.description}</p>}
+            {item.technologies?.length > 0 && (
+              <p className="mt-0.5 text-xs text-zinc-400">{item.technologies.join(' / ')}</p>
+            )}
+            {item.highlights?.length > 0 && (
+              <ul className="mt-1 list-disc pl-4">
+                {item.highlights.map((h: string, i: number) => (
+                  <li key={i} className="text-sm text-zinc-500">{h}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (section.type === 'certifications') {
+    const items = (content as CertificationsContent).items || [];
+    return (
+      <div className="space-y-1.5">
+        {items.map((item: any) => (
+          <div key={item.id} className="flex items-baseline justify-between">
+            <div className="text-sm">
+              <span className="font-medium text-zinc-800">{item.name}</span>
+              {item.issuer && <span className="text-zinc-500"> — {item.issuer}</span>}
+            </div>
+            {item.date && <span className="text-xs text-zinc-400">{item.date}</span>}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (section.type === 'languages') {
+    const items = (content as LanguagesContent).items || [];
+    return (
+      <div className="flex flex-wrap gap-x-6 gap-y-1">
+        {items.map((item: any) => (
+          <span key={item.id} className="text-sm">
+            <span className="font-medium text-zinc-800">{item.language}</span>
+            <span className="text-zinc-400"> — {item.proficiency}</span>
+          </span>
+        ))}
+      </div>
+    );
+  }
+
+  if (section.type === 'custom') {
+    const items = (content as CustomContent).items || [];
+    return (
+      <div className="space-y-3">
+        {items.map((item: any) => (
+          <div key={item.id}>
+            <div className="flex items-baseline justify-between">
+              <div className="text-sm">
+                <span className="font-medium text-zinc-800">{item.title}</span>
+                {item.subtitle && <span className="text-zinc-500"> — {item.subtitle}</span>}
+              </div>
+              {item.date && <span className="text-xs text-zinc-400">{item.date}</span>}
+            </div>
+            {item.description && <p className="mt-0.5 text-sm text-zinc-600">{item.description}</p>}
+          </div>
         ))}
       </div>
     );

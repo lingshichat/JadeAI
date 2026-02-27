@@ -22,7 +22,7 @@ function buildCorporateSectionContent(section: Section): string {
 
   if (section.type === 'work_experience') {
     return `<div class="space-y-4">${((c as WorkExperienceContent).items || []).map((it: any) => `<div>
-      <div class="flex items-baseline justify-between"><div><span class="text-sm font-bold" style="color:${NAVY}">${esc(it.position)}</span>${it.company ? `<span class="text-sm text-slate-600"> | ${esc(it.company)}</span>` : ''}</div><span class="shrink-0 rounded px-2 py-0.5 text-xs font-medium text-white" style="background:${BLUE}">${esc(it.startDate)} - ${it.current ? 'Present' : esc(it.endDate)}</span></div>
+      <div class="flex items-baseline justify-between"><div><span class="text-sm font-bold" style="color:${NAVY}">${esc(it.position)}</span>${it.company ? `<span class="text-sm text-slate-600"> | ${esc(it.company)}</span>` : ''}${it.location ? `<span class="text-sm text-slate-400">, ${esc(it.location)}</span>` : ''}</div><span class="shrink-0 rounded px-2 py-0.5 text-xs font-medium text-white" style="background:${BLUE}">${esc(it.startDate)} - ${it.current ? 'Present' : esc(it.endDate)}</span></div>
       ${it.description ? `<p class="mt-1 text-sm text-slate-600">${esc(it.description)}</p>` : ''}
       ${it.highlights?.length ? `<ul class="mt-1 list-disc pl-5">${it.highlights.map((h: string) => `<li class="text-sm text-slate-600">${esc(h)}</li>`).join('')}</ul>` : ''}
     </div>`).join('')}</div>`;
@@ -30,8 +30,9 @@ function buildCorporateSectionContent(section: Section): string {
 
   if (section.type === 'education') {
     return `<div class="space-y-3">${((c as EducationContent).items || []).map((it: any) => `<div>
-      <div class="flex items-baseline justify-between"><div><span class="text-sm font-bold" style="color:${NAVY}">${esc(it.degree)}${it.field ? ` in ${esc(it.field)}` : ''}</span>${it.institution ? `<span class="text-sm text-slate-600"> - ${esc(it.institution)}</span>` : ''}</div><span class="shrink-0 text-xs text-slate-400">${esc(it.startDate)} - ${esc(it.endDate)}</span></div>
+      <div class="flex items-baseline justify-between"><div><span class="text-sm font-bold" style="color:${NAVY}">${esc(it.degree)}${it.field ? ` in ${esc(it.field)}` : ''}</span>${it.institution ? `<span class="text-sm text-slate-600"> - ${esc(it.institution)}</span>` : ''}${it.location ? `<span class="text-sm text-slate-400">, ${esc(it.location)}</span>` : ''}</div><span class="shrink-0 text-xs text-slate-400">${esc(it.startDate)} - ${esc(it.endDate)}</span></div>
       ${it.gpa ? `<p class="text-sm text-slate-500">GPA: ${esc(it.gpa)}</p>` : ''}
+      ${it.highlights?.length ? `<ul class="mt-1 list-disc pl-5">${it.highlights.map((h: string) => `<li class="text-sm text-slate-600">${esc(h)}</li>`).join('')}</ul>` : ''}
     </div>`).join('')}</div>`;
   }
 

@@ -103,7 +103,7 @@ function MagazineSectionContent({ section }: { section: any }) {
                 {item.startDate} - {item.current ? 'Present' : item.endDate}
               </span>
             </div>
-            {item.company && <p className="text-sm font-medium italic" style={{ color: SECONDARY }}>{item.company}</p>}
+            {item.company && <p className="text-sm font-medium italic" style={{ color: SECONDARY }}>{item.company}{item.location ? `, ${item.location}` : ''}</p>}
             {item.description && <p className="mt-1 text-sm" style={{ color: SECONDARY }}>{item.description}</p>}
             {item.highlights?.length > 0 && (
               <ul className="mt-1.5 space-y-0.5">
@@ -131,7 +131,7 @@ function MagazineSectionContent({ section }: { section: any }) {
               <h3 className="text-sm font-bold" style={{ color: PRIMARY }}>{item.institution}</h3>
               <span className="text-xs" style={{ color: SECONDARY }}>{item.startDate} - {item.endDate}</span>
             </div>
-            <p className="text-sm" style={{ color: SECONDARY }}>{item.degree}{item.field ? ` in ${item.field}` : ''}</p>
+            <p className="text-sm" style={{ color: SECONDARY }}>{item.degree}{item.field ? ` in ${item.field}` : ''}{item.location ? ` — ${item.location}` : ''}</p>
             {item.gpa && <p className="text-xs" style={{ color: SECONDARY }}>GPA: {item.gpa}</p>}
             {item.highlights?.length > 0 && (
               <ul className="mt-1 space-y-0.5">

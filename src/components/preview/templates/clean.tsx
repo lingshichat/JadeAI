@@ -1,6 +1,17 @@
 'use client';
 
-import type { Resume, PersonalInfoContent, SummaryContent, WorkExperienceContent, EducationContent, SkillsContent } from '@/types/resume';
+import type {
+  Resume,
+  PersonalInfoContent,
+  SummaryContent,
+  WorkExperienceContent,
+  EducationContent,
+  SkillsContent,
+  ProjectsContent,
+  CertificationsContent,
+  LanguagesContent,
+  CustomContent,
+} from '@/types/resume';
 import { isSectionEmpty } from '../utils';
 
 const BLUE = '#0066cc';
@@ -61,6 +72,7 @@ function CleanSectionContent({ section }: { section: any }) {
               <div>
                 <span className="text-sm font-bold text-zinc-800">{item.position}</span>
                 {item.company && <span className="text-sm" style={{ color: TEAL }}> | {item.company}</span>}
+                {item.location && <span className="text-sm text-zinc-400"> , {item.location}</span>}
               </div>
               <span className="shrink-0 text-xs text-zinc-400">{item.startDate} – {item.current ? 'Present' : item.endDate}</span>
             </div>
@@ -85,10 +97,16 @@ function CleanSectionContent({ section }: { section: any }) {
               <div>
                 <span className="text-sm font-bold text-zinc-800">{item.degree}{item.field ? ` in ${item.field}` : ''}</span>
                 {item.institution && <span className="text-sm text-zinc-500"> — {item.institution}</span>}
+                {item.location && <span className="text-sm text-zinc-400"> , {item.location}</span>}
               </div>
               <span className="shrink-0 text-xs text-zinc-400">{item.startDate} – {item.endDate}</span>
             </div>
             {item.gpa && <p className="text-sm text-zinc-500">GPA: {item.gpa}</p>}
+            {item.highlights?.length > 0 && (
+              <ul className="mt-1 list-disc pl-4">
+                {item.highlights.map((h: string, i: number) => <li key={i} className="text-sm text-zinc-600">{h}</li>)}
+              </ul>
+            )}
           </div>
         ))}
       </div>
@@ -109,6 +127,93 @@ function CleanSectionContent({ section }: { section: any }) {
     );
   }
 
+  if (section.type === 'projects') {
+    const items = (content as ProjectsContent).items || [];
+    return (
+      <div className="space-y-4">
+        {items.map((item: any) => (
+          <div key={item.id}>
+            <div className="flex items-baseline justify-between">
+              <span className="text-sm font-bold" style={{ color: TEAL }}>{item.name}</span>
+              {item.startDate && (
+                <span className="shrink-0 text-xs text-zinc-400">
+                  {item.startDate}{item.endDate ? ` – ${item.endDate}` : ''}
+                </span>
+              )}
+            </div>
+            {item.description && <p className="mt-1 text-sm text-zinc-600">{item.description}</p>}
+            {item.technologies?.length > 0 && (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {item.technologies.map((t: string, i: number) => (
+                  <span key={i} className="rounded-full border px-2 py-0.5 text-[10px] font-medium" style={{ borderColor: TEAL, color: TEAL }}>
+                    {t}
+                  </span>
+                ))}
+              </div>
+            )}
+            {item.highlights?.length > 0 && (
+              <ul className="mt-1 list-disc pl-4">
+                {item.highlights.map((h: string, i: number) => <li key={i} className="text-sm text-zinc-600">{h}</li>)}
+              </ul>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (section.type === 'certifications') {
+    const items = (content as CertificationsContent).items || [];
+    return (
+      <div className="space-y-1.5">
+        {items.map((item: any) => (
+          <div key={item.id} className="flex items-baseline justify-between text-sm">
+            <div>
+              <span className="font-semibold" style={{ color: BLUE }}>{item.name}</span>
+              {item.issuer && <span className="text-zinc-600"> — {item.issuer}</span>}
+            </div>
+            {item.date && <span className="shrink-0 text-xs text-zinc-400">{item.date}</span>}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (section.type === 'languages') {
+    const items = (content as LanguagesContent).items || [];
+    return (
+      <div className="flex flex-wrap gap-x-6 gap-y-1">
+        {items.map((item: any) => (
+          <span key={item.id} className="text-sm">
+            <span className="font-semibold" style={{ color: BLUE }}>{item.language}</span>
+            <span className="text-zinc-500"> — {item.proficiency}</span>
+          </span>
+        ))}
+      </div>
+    );
+  }
+
+  if (section.type === 'custom') {
+    const items = (content as CustomContent).items || [];
+    return (
+      <div className="space-y-2">
+        {items.map((item: any) => (
+          <div key={item.id}>
+            <div className="flex items-baseline justify-between">
+              <div>
+                <span className="text-sm font-semibold" style={{ color: BLUE }}>{item.title}</span>
+                {item.subtitle && <span className="text-sm text-zinc-500"> — {item.subtitle}</span>}
+              </div>
+              {item.date && <span className="shrink-0 text-xs text-zinc-400">{item.date}</span>}
+            </div>
+            {item.description && <p className="mt-0.5 text-sm text-zinc-600">{item.description}</p>}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // Generic fallback
   if (content.items) {
     return (
       <div className="space-y-2">

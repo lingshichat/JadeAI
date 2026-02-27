@@ -6,6 +6,7 @@ import type {
   ProjectsContent,
   CertificationsContent,
   LanguagesContent,
+  CustomContent,
 } from '@/types/resume';
 import { esc, getPersonalInfo, visibleSections, buildHighlights, type ResumeWithSections, type Section } from '../utils';
 
@@ -14,21 +15,24 @@ function buildCompactRightContent(section: Section): string {
   if (section.type === 'summary') return `<p class="text-xs leading-relaxed text-zinc-600">${esc((c as SummaryContent).text)}</p>`;
   if (section.type === 'work_experience') {
     return `<div class="space-y-2.5">${((c as WorkExperienceContent).items || []).map((it: any) => `<div>
-      <div class="flex items-baseline justify-between"><div><span class="text-xs font-bold text-zinc-800">${esc(it.position)}</span>${it.company ? `<span class="text-xs text-zinc-500"> | ${esc(it.company)}</span>` : ''}</div><span class="shrink-0 text-[10px] text-zinc-400">${esc(it.startDate)} – ${it.current ? 'Present' : esc(it.endDate)}</span></div>
+      <div class="flex items-baseline justify-between"><div><span class="text-xs font-bold text-zinc-800">${esc(it.position)}</span>${it.company ? `<span class="text-xs text-zinc-500"> | ${esc(it.company)}</span>` : ''}${it.location ? `<span class="text-xs text-zinc-400">, ${esc(it.location)}</span>` : ''}</div><span class="shrink-0 text-[10px] text-zinc-400">${esc(it.startDate)} – ${it.current ? 'Present' : esc(it.endDate)}</span></div>
       ${it.description ? `<p class="mt-0.5 text-xs text-zinc-600">${esc(it.description)}</p>` : ''}
       ${it.highlights?.length ? `<ul class="mt-0.5 list-disc pl-3.5">${buildHighlights(it.highlights, 'text-xs text-zinc-600')}</ul>` : ''}
     </div>`).join('')}</div>`;
   }
   if (section.type === 'education') {
     return `<div class="space-y-2">${((c as EducationContent).items || []).map((it: any) => `<div>
-      <div class="flex items-baseline justify-between"><div><span class="text-xs font-bold text-zinc-800">${esc(it.degree)}${it.field ? ` in ${esc(it.field)}` : ''}</span>${it.institution ? `<span class="text-xs text-zinc-500"> — ${esc(it.institution)}</span>` : ''}</div><span class="shrink-0 text-[10px] text-zinc-400">${esc(it.startDate)} – ${esc(it.endDate)}</span></div>
+      <div class="flex items-baseline justify-between"><div><span class="text-xs font-bold text-zinc-800">${esc(it.degree)}${it.field ? ` in ${esc(it.field)}` : ''}</span>${it.institution ? `<span class="text-xs text-zinc-500"> — ${esc(it.institution)}</span>` : ''}${it.location ? `<span class="text-xs text-zinc-400">, ${esc(it.location)}</span>` : ''}</div><span class="shrink-0 text-[10px] text-zinc-400">${esc(it.startDate)} – ${esc(it.endDate)}</span></div>
       ${it.gpa ? `<p class="text-[10px] text-zinc-500">GPA: ${esc(it.gpa)}</p>` : ''}
+      ${it.highlights?.length ? `<ul class="mt-0.5 list-disc pl-3.5">${buildHighlights(it.highlights, 'text-xs text-zinc-600')}</ul>` : ''}
     </div>`).join('')}</div>`;
   }
   if (section.type === 'projects') {
     return `<div class="space-y-2">${((c as ProjectsContent).items || []).map((it: any) => `<div>
       <div class="flex items-baseline justify-between"><span class="text-xs font-bold text-zinc-800">${esc(it.name)}</span>${it.startDate ? `<span class="shrink-0 text-[10px] text-zinc-400">${esc(it.startDate)}${it.endDate ? ` – ${esc(it.endDate)}` : ''}</span>` : ''}</div>
       ${it.description ? `<p class="mt-0.5 text-xs text-zinc-600">${esc(it.description)}</p>` : ''}
+      ${it.technologies?.length ? `<p class="mt-0.5 text-[10px] text-zinc-400">Tech: ${esc(it.technologies.join(', '))}</p>` : ''}
+      ${it.highlights?.length ? `<ul class="mt-0.5 list-disc pl-3.5">${buildHighlights(it.highlights, 'text-xs text-zinc-600')}</ul>` : ''}
     </div>`).join('')}</div>`;
   }
   if (c.items) {
@@ -56,6 +60,14 @@ function buildCompactLeftContent(section: Section): string {
     return `<div class="space-y-1">${((c as CertificationsContent).items || []).map((it: any) =>
       `<div><p class="text-[10px] font-semibold text-zinc-700">${esc(it.name)}</p><p class="text-[9px] text-zinc-400">${esc(it.issuer)}${it.date ? ` (${esc(it.date)})` : ''}</p></div>`
     ).join('')}</div>`;
+  }
+  if (section.type === 'custom') {
+    return `<div class="space-y-1.5">${((c as CustomContent).items || []).map((it: any) => `<div>
+      <p class="text-[10px] font-semibold text-zinc-700">${esc(it.title)}</p>
+      ${it.subtitle ? `<p class="text-[9px] text-zinc-500">${esc(it.subtitle)}</p>` : ''}
+      ${it.date ? `<p class="text-[9px] text-zinc-400">${esc(it.date)}</p>` : ''}
+      ${it.description ? `<p class="text-[9px] text-zinc-400">${esc(it.description)}</p>` : ''}
+    </div>`).join('')}</div>`;
   }
   if (c.items) {
     return `<div class="space-y-1">${c.items.map((it: any) => `<div>

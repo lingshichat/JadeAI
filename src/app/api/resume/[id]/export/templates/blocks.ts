@@ -22,7 +22,7 @@ function buildBlocksSectionContent(section: Section): string {
   if (section.type === 'work_experience') {
     return `<div class="space-y-3">${((c as WorkExperienceContent).items || []).map((it: any) => `<div class="rounded-md border p-3" style="border-color:#e3e2de">
       <div class="flex items-baseline justify-between"><h3 class="text-sm font-semibold" style="color:${PRIMARY}">${esc(it.position)}</h3><span class="shrink-0 text-xs" style="color:#9b9a97">${esc(it.startDate)} - ${it.current ? 'Present' : esc(it.endDate)}</span></div>
-      ${it.company ? `<p class="text-sm" style="color:${ACCENT}">${esc(it.company)}</p>` : ''}
+      ${it.company ? `<p class="text-sm" style="color:${ACCENT}">${esc(it.company)}${it.location ? ` , ${esc(it.location)}` : ''}</p>` : ''}
       ${it.description ? `<p class="mt-1 text-sm" style="color:#787774">${esc(it.description)}</p>` : ''}
       ${it.highlights?.length ? `<ul class="mt-1 list-disc pl-4">${buildHighlights(it.highlights, 'text-sm" style="color:#787774')}</ul>` : ''}
     </div>`).join('')}</div>`;
@@ -31,7 +31,7 @@ function buildBlocksSectionContent(section: Section): string {
   if (section.type === 'education') {
     return `<div class="space-y-3">${((c as EducationContent).items || []).map((it: any) => `<div class="rounded-md border p-3" style="border-color:#e3e2de">
       <div class="flex items-baseline justify-between"><h3 class="text-sm font-semibold" style="color:${PRIMARY}">${esc(it.institution)}</h3><span class="text-xs" style="color:#9b9a97">${esc(it.startDate)} - ${esc(it.endDate)}</span></div>
-      <p class="text-sm" style="color:#787774">${esc(it.degree)}${it.field ? ` in ${esc(it.field)}` : ''}</p>
+      <p class="text-sm" style="color:#787774">${esc(it.degree)}${it.field ? ` in ${esc(it.field)}` : ''}${it.location ? ` , ${esc(it.location)}` : ''}</p>
       ${it.gpa ? `<p class="text-xs" style="color:#9b9a97">GPA: ${esc(it.gpa)}</p>` : ''}
       ${it.highlights?.length ? `<ul class="mt-1 list-disc pl-4">${buildHighlights(it.highlights, 'text-sm" style="color:#787774')}</ul>` : ''}
     </div>`).join('')}</div>`;

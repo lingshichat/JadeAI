@@ -101,7 +101,12 @@ function CreativeSectionContent({ section }: { section: any }) {
                 {item.startDate} – {item.current ? 'Present' : item.endDate}
               </span>
             </div>
-            {item.company && <p className="text-sm font-medium" style={{ color: PRIMARY }}>{item.company}</p>}
+            {item.company && (
+              <p className="text-sm font-medium" style={{ color: PRIMARY }}>
+                {item.company}
+                {item.location && <span className="text-xs font-normal text-zinc-400">, {item.location}</span>}
+              </p>
+            )}
             {item.description && <p className="mt-1 text-sm text-zinc-600">{item.description}</p>}
             {item.highlights?.length > 0 && (
               <ul className="mt-1.5 space-y-0.5">
@@ -129,7 +134,10 @@ function CreativeSectionContent({ section }: { section: any }) {
               <h3 className="text-sm font-bold text-zinc-800">{item.institution}</h3>
               <span className="text-xs text-zinc-400">{item.startDate} – {item.endDate}</span>
             </div>
-            <p className="text-sm text-zinc-600">{item.degree}{item.field ? ` in ${item.field}` : ''}</p>
+            <p className="text-sm text-zinc-600">
+              {item.degree}{item.field ? ` in ${item.field}` : ''}
+              {item.location && <span className="text-zinc-400">, {item.location}</span>}
+            </p>
             {item.gpa && <p className="text-xs text-zinc-500">GPA: {item.gpa}</p>}
             {item.highlights?.length > 0 && (
               <ul className="mt-1 space-y-0.5">
@@ -177,7 +185,14 @@ function CreativeSectionContent({ section }: { section: any }) {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {items.map((item: any) => (
           <div key={item.id} className="rounded-lg border border-zinc-100 p-4">
-            <h3 className="text-sm font-bold" style={{ color: PRIMARY }}>{item.name}</h3>
+            <div className="flex items-baseline justify-between">
+              <h3 className="text-sm font-bold" style={{ color: PRIMARY }}>{item.name}</h3>
+              {item.startDate && (
+                <span className="text-xs text-zinc-400">
+                  {item.startDate}{item.endDate ? ` - ${item.endDate}` : ''}
+                </span>
+              )}
+            </div>
             {item.description && <p className="mt-1 text-sm text-zinc-600">{item.description}</p>}
             {item.technologies?.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1">

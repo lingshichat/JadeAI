@@ -1,3 +1,9 @@
+import type {
+  ProjectsContent,
+  CertificationsContent,
+  LanguagesContent,
+  CustomContent,
+} from '@/types/resume';
 import { esc, getPersonalInfo, visibleSections, buildHighlights, type ResumeWithSections, type Section } from '../utils';
 
 function buildEuroSectionContent(s: Section): string {
@@ -24,6 +30,7 @@ function buildEuroSectionContent(s: Section): string {
         <span class="shrink-0 text-xs text-zinc-400">${esc(it.startDate)} – ${esc(it.endDate || '')}</span>
       </div>
       ${it.gpa ? `<p class="text-sm text-zinc-500">GPA: ${esc(it.gpa)}</p>` : ''}
+      ${it.highlights?.length ? `<ul class="mt-1 list-disc pl-4">${buildHighlights(it.highlights, 'text-sm text-zinc-600')}</ul>` : ''}
     </div>`).join('')}</div>`;
   }
 
@@ -31,6 +38,34 @@ function buildEuroSectionContent(s: Section): string {
     return `<div class="space-y-1">${(c.categories || []).map((cat: any) =>
       `<div class="flex text-sm"><span class="w-28 shrink-0 font-medium" style="color:${BL}">${esc(cat.name)}:</span><span class="text-zinc-600">${esc((cat.skills || []).join(', '))}</span></div>`
     ).join('')}</div>`;
+  }
+
+  if (s.type === 'projects') {
+    return `<div class="space-y-3">${((c as ProjectsContent).items || []).map((it: any) => `<div>
+      <div class="flex items-baseline justify-between"><span class="text-sm font-bold text-zinc-800">${esc(it.name)}</span>${it.startDate ? `<span class="shrink-0 text-xs text-zinc-400">${esc(it.startDate)}${it.endDate ? ` – ${esc(it.endDate)}` : ''}</span>` : ''}</div>
+      ${it.description ? `<p class="mt-1 text-sm text-zinc-600">${esc(it.description)}</p>` : ''}
+      ${it.technologies?.length ? `<p class="mt-0.5 text-xs text-zinc-400">Tech: ${esc(it.technologies.join(', '))}</p>` : ''}
+      ${it.highlights?.length ? `<ul class="mt-1 list-disc pl-4">${buildHighlights(it.highlights, 'text-sm text-zinc-600')}</ul>` : ''}
+    </div>`).join('')}</div>`;
+  }
+
+  if (s.type === 'certifications') {
+    return `<div class="space-y-1.5">${((c as CertificationsContent).items || []).map((it: any) =>
+      `<div class="flex items-baseline justify-between text-sm"><div><span class="font-semibold text-zinc-800">${esc(it.name)}</span>${it.issuer ? `<span class="text-zinc-500"> — ${esc(it.issuer)}</span>` : ''}</div>${it.date ? `<span class="shrink-0 text-xs text-zinc-400">${esc(it.date)}</span>` : ''}</div>`
+    ).join('')}</div>`;
+  }
+
+  if (s.type === 'languages') {
+    return `<div class="space-y-1">${((c as LanguagesContent).items || []).map((it: any) =>
+      `<div class="flex text-sm"><span class="w-28 shrink-0 font-medium" style="color:${BL}">${esc(it.language)}:</span><span class="text-zinc-600">${esc(it.proficiency)}</span></div>`
+    ).join('')}</div>`;
+  }
+
+  if (s.type === 'custom') {
+    return `<div class="space-y-3">${((c as CustomContent).items || []).map((it: any) => `<div>
+      <div class="flex items-baseline justify-between"><div><span class="text-sm font-semibold text-zinc-800">${esc(it.title)}</span>${it.subtitle ? `<span class="text-sm text-zinc-500"> — ${esc(it.subtitle)}</span>` : ''}</div>${it.date ? `<span class="shrink-0 text-xs text-zinc-400">${esc(it.date)}</span>` : ''}</div>
+      ${it.description ? `<p class="mt-0.5 text-sm text-zinc-600">${esc(it.description)}</p>` : ''}
+    </div>`).join('')}</div>`;
   }
 
   if (c.items) {

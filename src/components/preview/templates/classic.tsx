@@ -1,6 +1,17 @@
 'use client';
 
-import type { Resume, PersonalInfoContent, SummaryContent, WorkExperienceContent, EducationContent, SkillsContent } from '@/types/resume';
+import type {
+  Resume,
+  PersonalInfoContent,
+  SummaryContent,
+  WorkExperienceContent,
+  EducationContent,
+  SkillsContent,
+  ProjectsContent,
+  CertificationsContent,
+  LanguagesContent,
+  CustomContent,
+} from '@/types/resume';
 import { isSectionEmpty } from '../utils';
 
 export function ClassicTemplate({ resume }: { resume: Resume }) {
@@ -60,6 +71,7 @@ function SectionContent({ section }: { section: any }) {
               <div>
                 <span className="font-semibold text-zinc-800 text-sm">{item.position}</span>
                 {item.company && <span className="text-sm text-zinc-600"> at {item.company}</span>}
+                {item.location && <span className="text-sm text-zinc-400"> , {item.location}</span>}
               </div>
               <span className="text-xs text-zinc-400">{item.startDate} - {item.current ? 'Present' : item.endDate}</span>
             </div>
@@ -87,10 +99,18 @@ function SectionContent({ section }: { section: any }) {
               <div>
                 <span className="font-semibold text-zinc-800 text-sm">{item.degree} {item.field && `in ${item.field}`}</span>
                 {item.institution && <span className="text-sm text-zinc-600"> - {item.institution}</span>}
+                {item.location && <span className="text-sm text-zinc-400"> , {item.location}</span>}
               </div>
               <span className="text-xs text-zinc-400">{item.startDate} - {item.endDate}</span>
             </div>
             {item.gpa && <p className="text-sm text-zinc-500">GPA: {item.gpa}</p>}
+            {item.highlights?.length > 0 && (
+              <ul className="mt-1 list-disc pl-4">
+                {item.highlights.map((h: string, i: number) => (
+                  <li key={i} className="text-sm text-zinc-600">{h}</li>
+                ))}
+              </ul>
+            )}
           </div>
         ))}
       </div>
@@ -105,6 +125,85 @@ function SectionContent({ section }: { section: any }) {
           <div key={cat.id} className="flex text-sm">
             <span className="font-medium text-zinc-700 w-28 shrink-0">{cat.name}:</span>
             <span className="text-zinc-600">{cat.skills?.join(', ')}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (section.type === 'projects') {
+    const items = (content as ProjectsContent).items || [];
+    return (
+      <div className="space-y-3">
+        {items.map((item: any) => (
+          <div key={item.id}>
+            <div className="flex items-baseline justify-between">
+              <span className="font-semibold text-zinc-800 text-sm">{item.name}</span>
+              {item.startDate && (
+                <span className="text-xs text-zinc-400">
+                  {item.startDate}{item.endDate ? ` - ${item.endDate}` : ''}
+                </span>
+              )}
+            </div>
+            {item.description && <p className="mt-1 text-sm text-zinc-600">{item.description}</p>}
+            {item.technologies?.length > 0 && (
+              <p className="mt-0.5 text-xs text-zinc-400">Tech: {item.technologies.join(', ')}</p>
+            )}
+            {item.highlights?.length > 0 && (
+              <ul className="mt-1 list-disc pl-4">
+                {item.highlights.map((h: string, i: number) => (
+                  <li key={i} className="text-sm text-zinc-600">{h}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (section.type === 'certifications') {
+    const items = (content as CertificationsContent).items || [];
+    return (
+      <div className="space-y-1">
+        {items.map((item: any) => (
+          <div key={item.id}>
+            <span className="font-semibold text-zinc-800 text-sm">{item.name}</span>
+            <span className="text-sm text-zinc-600"> — {item.issuer}{item.date ? ` (${item.date})` : ''}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (section.type === 'languages') {
+    const items = (content as LanguagesContent).items || [];
+    return (
+      <div className="space-y-1">
+        {items.map((item: any) => (
+          <div key={item.id}>
+            <span className="font-semibold text-zinc-800 text-sm">{item.language}</span>
+            <span className="text-sm text-zinc-600"> — {item.proficiency}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (section.type === 'custom') {
+    const items = (content as CustomContent).items || [];
+    return (
+      <div className="space-y-2">
+        {items.map((item: any) => (
+          <div key={item.id}>
+            <div className="flex items-baseline justify-between">
+              <div>
+                <span className="text-sm font-semibold text-zinc-800">{item.title}</span>
+                {item.subtitle && <span className="text-sm text-zinc-500"> — {item.subtitle}</span>}
+              </div>
+              {item.date && <span className="text-xs text-zinc-400">{item.date}</span>}
+            </div>
+            {item.description && <p className="mt-0.5 text-sm text-zinc-600">{item.description}</p>}
           </div>
         ))}
       </div>

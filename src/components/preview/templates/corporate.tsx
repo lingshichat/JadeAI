@@ -64,6 +64,7 @@ function CorporateSectionContent({ section }: { section: any }) {
               <div>
                 <span className="text-sm font-bold" style={{ color: NAVY }}>{item.position}</span>
                 {item.company && <span className="text-sm text-slate-600"> | {item.company}</span>}
+                {item.location && <span className="text-sm text-slate-400">, {item.location}</span>}
               </div>
               <span className="shrink-0 rounded px-2 py-0.5 text-xs font-medium text-white" style={{ background: BLUE }}>
                 {item.startDate} - {item.current ? 'Present' : item.endDate}
@@ -92,10 +93,18 @@ function CorporateSectionContent({ section }: { section: any }) {
               <div>
                 <span className="text-sm font-bold" style={{ color: NAVY }}>{item.degree}{item.field ? ` in ${item.field}` : ''}</span>
                 {item.institution && <span className="text-sm text-slate-600"> - {item.institution}</span>}
+                {item.location && <span className="text-sm text-slate-400">, {item.location}</span>}
               </div>
               <span className="shrink-0 text-xs text-slate-400">{item.startDate} - {item.endDate}</span>
             </div>
             {item.gpa && <p className="text-sm text-slate-500">GPA: {item.gpa}</p>}
+            {item.highlights?.length > 0 && (
+              <ul className="mt-1 list-disc pl-5">
+                {item.highlights.map((h: string, i: number) => (
+                  <li key={i} className="text-sm text-slate-600">{h}</li>
+                ))}
+              </ul>
+            )}
           </div>
         ))}
       </div>

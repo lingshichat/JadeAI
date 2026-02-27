@@ -98,6 +98,13 @@ function FinanceSectionContent({ section }: { section: any }) {
               <span className="shrink-0 text-xs italic text-slate-400">{item.startDate} - {item.endDate}</span>
             </div>
             {item.gpa && <p className="text-sm text-slate-500">GPA: {item.gpa}</p>}
+            {item.highlights?.length > 0 && (
+              <ul className="mt-1 list-disc pl-5">
+                {item.highlights.map((h: string, i: number) => (
+                  <li key={i} className="text-sm text-slate-600">{h}</li>
+                ))}
+              </ul>
+            )}
           </div>
         ))}
       </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import type { Resume, PersonalInfoContent, SummaryContent, WorkExperienceContent, EducationContent, SkillsContent } from '@/types/resume';
+import type { Resume, PersonalInfoContent, SummaryContent, WorkExperienceContent, EducationContent, SkillsContent, ProjectsContent, CertificationsContent, LanguagesContent, CustomContent } from '@/types/resume';
 import { isSectionEmpty } from '../utils';
 
 const CHARCOAL = '#2d3436';
@@ -93,6 +93,11 @@ function ExecutiveSectionContent({ section }: { section: any }) {
               <span className="shrink-0 text-xs text-zinc-400">{item.startDate} – {item.endDate}</span>
             </div>
             {item.gpa && <p className="text-sm text-zinc-500">GPA: {item.gpa}</p>}
+            {item.highlights?.length > 0 && (
+              <ul className="mt-1 list-disc pl-5">
+                {item.highlights.map((h: string, i: number) => <li key={i} className="text-sm text-zinc-600">{h}</li>)}
+              </ul>
+            )}
           </div>
         ))}
       </div>
@@ -109,6 +114,83 @@ function ExecutiveSectionContent({ section }: { section: any }) {
             </span>
           ))
         )}
+      </div>
+    );
+  }
+
+  if (section.type === 'projects') {
+    const items = (content as ProjectsContent).items || [];
+    return (
+      <div className="space-y-3">
+        {items.map((item: any) => (
+          <div key={item.id}>
+            <div className="flex items-baseline justify-between">
+              <span className="text-sm font-bold" style={{ color: CHARCOAL }}>{item.name}</span>
+              {item.startDate && (
+                <span className="shrink-0 rounded px-2 py-0.5 text-xs font-medium text-white" style={{ background: EMERALD }}>
+                  {item.startDate}{item.endDate ? ` – ${item.endDate}` : ''}
+                </span>
+              )}
+            </div>
+            {item.description && <p className="mt-1 text-sm text-zinc-600">{item.description}</p>}
+            {item.technologies?.length > 0 && <p className="mt-0.5 text-xs text-zinc-400">Tech: {item.technologies.join(', ')}</p>}
+            {item.highlights?.length > 0 && (
+              <ul className="mt-1 list-disc pl-5">
+                {item.highlights.map((h: string, i: number) => <li key={i} className="text-sm text-zinc-600">{h}</li>)}
+              </ul>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (section.type === 'certifications') {
+    const items = (content as CertificationsContent).items || [];
+    return (
+      <div className="space-y-1.5">
+        {items.map((item: any) => (
+          <div key={item.id} className="flex items-baseline justify-between text-sm">
+            <div>
+              <span className="font-bold" style={{ color: CHARCOAL }}>{item.name}</span>
+              {item.issuer && <span className="text-zinc-600"> — {item.issuer}</span>}
+            </div>
+            {item.date && <span className="shrink-0 text-xs text-zinc-400">{item.date}</span>}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (section.type === 'languages') {
+    const items = (content as LanguagesContent).items || [];
+    return (
+      <div className="flex flex-wrap gap-2">
+        {items.map((item: any) => (
+          <span key={item.id} className="rounded border px-2.5 py-1 text-xs font-medium" style={{ borderColor: EMERALD, color: CHARCOAL }}>
+            {item.language}<span className="text-zinc-500"> — {item.proficiency}</span>
+          </span>
+        ))}
+      </div>
+    );
+  }
+
+  if (section.type === 'custom') {
+    const items = (content as CustomContent).items || [];
+    return (
+      <div className="space-y-3">
+        {items.map((item: any) => (
+          <div key={item.id}>
+            <div className="flex items-baseline justify-between">
+              <div>
+                <span className="text-sm font-bold" style={{ color: CHARCOAL }}>{item.title}</span>
+                {item.subtitle && <span className="text-sm text-zinc-500"> — {item.subtitle}</span>}
+              </div>
+              {item.date && <span className="shrink-0 text-xs text-zinc-400">{item.date}</span>}
+            </div>
+            {item.description && <p className="mt-0.5 text-sm text-zinc-600">{item.description}</p>}
+          </div>
+        ))}
       </div>
     );
   }

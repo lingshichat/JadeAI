@@ -101,7 +101,7 @@ function ArtisticSectionContent({ section }: { section: any }) {
                 {item.startDate} - {item.current ? 'Present' : item.endDate}
               </span>
             </div>
-            {item.company && <p className="text-sm font-medium" style={{ color: ACCENT }}>{item.company}</p>}
+            {item.company && <p className="text-sm font-medium" style={{ color: ACCENT }}>{item.company}{item.location ? `, ${item.location}` : ''}</p>}
             {item.description && <p className="mt-1 text-sm text-zinc-600">{item.description}</p>}
             {item.highlights?.length > 0 && (
               <ul className="mt-1.5 space-y-0.5">
@@ -129,7 +129,7 @@ function ArtisticSectionContent({ section }: { section: any }) {
               <h3 className="text-sm font-bold" style={{ color: PRIMARY }}>{item.institution}</h3>
               <span className="text-xs text-zinc-400">{item.startDate} - {item.endDate}</span>
             </div>
-            <p className="text-sm text-zinc-600">{item.degree}{item.field ? ` in ${item.field}` : ''}</p>
+            <p className="text-sm text-zinc-600">{item.degree}{item.field ? ` in ${item.field}` : ''}{item.location ? ` — ${item.location}` : ''}</p>
             {item.gpa && <p className="text-xs text-zinc-500">GPA: {item.gpa}</p>}
             {item.highlights?.length > 0 && (
               <ul className="mt-1 space-y-0.5">

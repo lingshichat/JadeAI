@@ -29,6 +29,7 @@ function buildTimelineSectionContent(s: Section): string {
         <span class="shrink-0 text-xs text-zinc-400">${esc(it.startDate)} – ${esc(it.endDate || '')}</span>
       </div>
       ${it.gpa ? `<p class="text-sm text-zinc-500">GPA: ${esc(it.gpa)}</p>` : ''}
+      ${it.highlights?.length ? `<ul class="mt-1 list-disc pl-4">${buildHighlights(it.highlights, 'text-sm text-zinc-600')}</ul>` : ''}
     </div>`).join('')}</div>`;
   }
 
@@ -36,6 +37,36 @@ function buildTimelineSectionContent(s: Section): string {
     return `<div class="space-y-1">${(c.categories || []).map((cat: any) =>
       `<div class="flex text-sm"><span class="w-28 shrink-0 font-medium" style="color:${AC}">${esc(cat.name)}:</span><span class="text-zinc-600">${esc((cat.skills || []).join(', '))}</span></div>`
     ).join('')}</div>`;
+  }
+
+  if (s.type === 'projects') {
+    const items = c.items || [];
+    return `<div class="relative border-l-2 pl-6 ml-2" style="border-color:#e2e8f0">${items.map((it: any, idx: number) => `<div class="relative${idx < items.length - 1 ? ' pb-5' : ''}">
+      <div class="absolute -left-[31px] top-1 h-4 w-4 rounded-full border-2 bg-white" style="border-color:${AC}"></div>
+      <div class="flex items-baseline justify-between"><span class="text-sm font-bold" style="color:${BG}">${esc(it.name)}</span>${it.startDate ? `<span class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium" style="background:#eff6ff;color:${AC}">${esc(it.startDate)}${it.endDate ? ` – ${esc(it.endDate)}` : ''}</span>` : ''}</div>
+      ${it.description ? `<p class="mt-1 text-sm text-zinc-600">${esc(it.description)}</p>` : ''}
+      ${it.technologies?.length ? `<div class="mt-1 flex flex-wrap gap-1">${it.technologies.map((t: string) => `<span class="rounded-full px-2 py-0.5 text-[10px] font-medium" style="background:#eff6ff;color:${AC}">${esc(t)}</span>`).join('')}</div>` : ''}
+      ${it.highlights?.length ? `<ul class="mt-1 list-disc pl-4">${buildHighlights(it.highlights, 'text-sm text-zinc-600')}</ul>` : ''}
+    </div>`).join('')}</div>`;
+  }
+
+  if (s.type === 'certifications') {
+    return `<div class="space-y-1.5">${(c.items || []).map((it: any) =>
+      `<div class="flex items-baseline justify-between text-sm"><div><span class="font-semibold" style="color:${BG}">${esc(it.name)}</span>${it.issuer ? `<span class="text-zinc-500"> — ${esc(it.issuer)}</span>` : ''}</div>${it.date ? `<span class="shrink-0 text-xs text-zinc-400">${esc(it.date)}</span>` : ''}</div>`
+    ).join('')}</div>`;
+  }
+
+  if (s.type === 'languages') {
+    return `<div class="flex flex-wrap gap-x-6 gap-y-1">${(c.items || []).map((it: any) =>
+      `<span class="text-sm"><span class="font-medium" style="color:${AC}">${esc(it.language)}</span><span class="text-zinc-500"> — ${esc(it.proficiency)}</span></span>`
+    ).join('')}</div>`;
+  }
+
+  if (s.type === 'custom') {
+    return `<div class="space-y-2">${(c.items || []).map((it: any) => `<div>
+      <div class="flex items-baseline justify-between"><div><span class="text-sm font-semibold" style="color:${BG}">${esc(it.title)}</span>${it.subtitle ? `<span class="text-sm text-zinc-500"> — ${esc(it.subtitle)}</span>` : ''}</div>${it.date ? `<span class="shrink-0 text-xs text-zinc-400">${esc(it.date)}</span>` : ''}</div>
+      ${it.description ? `<p class="mt-0.5 text-sm text-zinc-600">${esc(it.description)}</p>` : ''}
+    </div>`).join('')}</div>`;
   }
 
   if (c.items) {

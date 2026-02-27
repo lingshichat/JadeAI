@@ -92,6 +92,13 @@ function NordicSectionContent({ section }: { section: any }) {
               <span className="shrink-0 text-xs font-light" style={{ color: SLATE_400 }}>{item.startDate} - {item.endDate}</span>
             </div>
             {item.gpa && <p className="text-xs font-light" style={{ color: SLATE_400 }}>GPA: {item.gpa}</p>}
+            {item.highlights?.length > 0 && (
+              <ul className="mt-1.5 list-disc pl-4">
+                {item.highlights.map((h: string, i: number) => (
+                  <li key={i} className="text-sm font-light" style={{ color: SLATE_500 }}>{h}</li>
+                ))}
+              </ul>
+            )}
           </div>
         ))}
       </div>

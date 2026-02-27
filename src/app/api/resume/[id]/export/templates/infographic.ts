@@ -3,6 +3,10 @@ import type {
   WorkExperienceContent,
   EducationContent,
   SkillsContent,
+  ProjectsContent,
+  CertificationsContent,
+  LanguagesContent,
+  CustomContent,
 } from '@/types/resume';
 import { esc, getPersonalInfo, visibleSections, buildHighlights, type ResumeWithSections, type Section } from '../utils';
 
@@ -22,6 +26,7 @@ function buildInfographicSectionContent(section: Section, color: string, colorIn
     return `<div class="space-y-3">${((c as EducationContent).items || []).map((it: any) => `<div class="rounded-lg border border-zinc-100 p-4">
       <div class="flex items-baseline justify-between"><div><span class="text-sm font-bold text-zinc-800">${esc(it.degree)}${it.field ? ` in ${esc(it.field)}` : ''}</span>${it.institution ? `<span class="text-sm text-zinc-500"> — ${esc(it.institution)}</span>` : ''}</div><span class="shrink-0 text-xs text-zinc-400">${esc(it.startDate)} – ${esc(it.endDate)}</span></div>
       ${it.gpa ? `<p class="text-sm text-zinc-500">GPA: ${esc(it.gpa)}</p>` : ''}
+      ${it.highlights?.length ? `<ul class="mt-1 list-disc pl-4">${buildHighlights(it.highlights, 'text-sm text-zinc-600')}</ul>` : ''}
     </div>`).join('')}</div>`;
   }
   if (section.type === 'skills') {
@@ -30,6 +35,30 @@ function buildInfographicSectionContent(section: Section, color: string, colorIn
       <div class="flex flex-wrap gap-1.5">${(cat.skills || []).map((skill: string) =>
         `<span class="rounded-full px-2.5 py-0.5 text-xs font-medium text-white" style="background:${COLORS[(colorIndex + ci) % COLORS.length]}">${esc(skill)}</span>`
       ).join('')}</div>
+    </div>`).join('')}</div>`;
+  }
+  if (section.type === 'projects') {
+    return `<div class="space-y-3">${((c as ProjectsContent).items || []).map((it: any) => `<div class="rounded-lg border border-zinc-100 p-4">
+      <div class="flex items-baseline justify-between"><h3 class="text-sm font-bold" style="color:${color}">${esc(it.name)}</h3>${it.startDate ? `<span class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium text-white" style="background:${color}">${esc(it.startDate)}${it.endDate ? ` – ${esc(it.endDate)}` : ''}</span>` : ''}</div>
+      ${it.description ? `<p class="mt-1 text-sm text-zinc-600">${esc(it.description)}</p>` : ''}
+      ${it.technologies?.length ? `<div class="mt-1.5 flex flex-wrap gap-1">${it.technologies.map((t: string) => `<span class="rounded-full px-2 py-0.5 text-[10px] font-medium text-white" style="background:${color};opacity:0.8">${esc(t)}</span>`).join('')}</div>` : ''}
+      ${it.highlights?.length ? `<ul class="mt-1 list-disc pl-4">${buildHighlights(it.highlights, 'text-sm text-zinc-600')}</ul>` : ''}
+    </div>`).join('')}</div>`;
+  }
+  if (section.type === 'certifications') {
+    return `<div class="space-y-1.5">${((c as CertificationsContent).items || []).map((it: any) =>
+      `<div class="flex items-baseline justify-between rounded-lg border border-zinc-100 p-3"><div><span class="text-sm font-bold" style="color:${color}">${esc(it.name)}</span>${it.issuer ? `<span class="text-sm text-zinc-500"> — ${esc(it.issuer)}</span>` : ''}</div>${it.date ? `<span class="shrink-0 text-xs text-zinc-400">${esc(it.date)}</span>` : ''}</div>`
+    ).join('')}</div>`;
+  }
+  if (section.type === 'languages') {
+    return `<div class="flex flex-wrap gap-2">${((c as LanguagesContent).items || []).map((it: any, i: number) =>
+      `<span class="rounded-full px-3 py-1 text-xs font-medium text-white" style="background:${COLORS[(colorIndex + i) % COLORS.length]}">${esc(it.language)} — ${esc(it.proficiency)}</span>`
+    ).join('')}</div>`;
+  }
+  if (section.type === 'custom') {
+    return `<div class="space-y-3">${((c as CustomContent).items || []).map((it: any) => `<div class="rounded-lg border border-zinc-100 p-4">
+      <div class="flex items-baseline justify-between"><div><span class="text-sm font-bold" style="color:${color}">${esc(it.title)}</span>${it.subtitle ? `<span class="text-sm text-zinc-500"> — ${esc(it.subtitle)}</span>` : ''}</div>${it.date ? `<span class="shrink-0 text-xs text-zinc-400">${esc(it.date)}</span>` : ''}</div>
+      ${it.description ? `<p class="mt-1 text-sm text-zinc-600">${esc(it.description)}</p>` : ''}
     </div>`).join('')}</div>`;
   }
   if (c.items) {

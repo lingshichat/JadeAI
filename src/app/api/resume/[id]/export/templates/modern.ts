@@ -3,6 +3,10 @@ import type {
   WorkExperienceContent,
   EducationContent,
   SkillsContent,
+  ProjectsContent,
+  CertificationsContent,
+  LanguagesContent,
+  CustomContent,
 } from '@/types/resume';
 import { esc, getPersonalInfo, visibleSections, buildHighlights, type ResumeWithSections, type Section } from '../utils';
 
@@ -22,6 +26,8 @@ function buildModernSectionContent(section: Section): string {
       <h3 class="text-sm font-semibold text-zinc-800">${esc(it.institution)}</h3>
       <p class="text-sm text-zinc-600">${esc(it.degree)} ${it.field ? `- ${esc(it.field)}` : ''}</p>
       <span class="text-xs text-zinc-400">${esc(it.startDate)} - ${esc(it.endDate)}</span>
+      ${it.gpa ? `<p class="mt-0.5 text-xs text-zinc-500">GPA: ${esc(it.gpa)}</p>` : ''}
+      ${it.highlights?.length ? `<ul class="mt-1 list-disc pl-4">${buildHighlights(it.highlights, 'text-sm text-zinc-600')}</ul>` : ''}
     </div>`).join('')}</div>`;
   }
   if (section.type === 'skills') {
@@ -29,6 +35,30 @@ function buildModernSectionContent(section: Section): string {
     return `<div class="flex flex-wrap gap-2">${allSkills.map((skill: string) =>
       `<span class="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-medium text-zinc-700">${esc(skill)}</span>`
     ).join('')}</div>`;
+  }
+  if (section.type === 'projects') {
+    return `<div class="space-y-4">${((c as ProjectsContent).items || []).map((it: any) => `<div class="border-l-2 pl-4" style="border-color:#e94560">
+      <div class="flex items-baseline justify-between"><h3 class="text-sm font-semibold text-zinc-800">${esc(it.name)}</h3>${it.startDate ? `<span class="shrink-0 rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs text-zinc-500">${esc(it.startDate)}${it.endDate ? ` - ${esc(it.endDate)}` : ''}</span>` : ''}</div>
+      ${it.description ? `<p class="mt-1 text-sm text-zinc-600">${esc(it.description)}</p>` : ''}
+      ${it.technologies?.length ? `<div class="mt-1 flex flex-wrap gap-1.5">${it.technologies.map((t: string) => `<span class="rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-xs text-zinc-600">${esc(t)}</span>`).join('')}</div>` : ''}
+      ${it.highlights?.length ? `<ul class="mt-1 list-disc pl-4">${buildHighlights(it.highlights, 'text-sm text-zinc-600')}</ul>` : ''}
+    </div>`).join('')}</div>`;
+  }
+  if (section.type === 'certifications') {
+    return `<div class="space-y-1.5">${((c as CertificationsContent).items || []).map((it: any) =>
+      `<div class="flex items-baseline justify-between border-l-2 pl-4" style="border-color:#0f3460"><div><span class="text-sm font-semibold text-zinc-800">${esc(it.name)}</span>${it.issuer ? `<span class="text-sm text-zinc-500"> — ${esc(it.issuer)}</span>` : ''}</div>${it.date ? `<span class="shrink-0 text-xs text-zinc-400">${esc(it.date)}</span>` : ''}</div>`
+    ).join('')}</div>`;
+  }
+  if (section.type === 'languages') {
+    return `<div class="flex flex-wrap gap-2">${((c as LanguagesContent).items || []).map((it: any) =>
+      `<span class="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-medium text-zinc-700">${esc(it.language)} <span class="text-zinc-400">— ${esc(it.proficiency)}</span></span>`
+    ).join('')}</div>`;
+  }
+  if (section.type === 'custom') {
+    return `<div class="space-y-3">${((c as CustomContent).items || []).map((it: any) => `<div class="border-l-2 pl-4" style="border-color:#e94560">
+      <div class="flex items-baseline justify-between"><div><h3 class="text-sm font-semibold text-zinc-800">${esc(it.title)}</h3>${it.subtitle ? `<span class="text-sm text-zinc-500"> — ${esc(it.subtitle)}</span>` : ''}</div>${it.date ? `<span class="shrink-0 text-xs text-zinc-400">${esc(it.date)}</span>` : ''}</div>
+      ${it.description ? `<p class="mt-0.5 text-sm text-zinc-600">${esc(it.description)}</p>` : ''}
+    </div>`).join('')}</div>`;
   }
   if (c.items) {
     return `<div class="space-y-2">${c.items.map((it: any) => `<div class="border-l-2 border-zinc-200 pl-4"><span class="text-sm font-medium text-zinc-700">${esc(it.name || it.title || it.language)}</span>${it.description ? `<p class="text-sm text-zinc-600">${esc(it.description)}</p>` : ''}</div>`).join('')}</div>`;
