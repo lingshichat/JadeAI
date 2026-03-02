@@ -86,7 +86,7 @@ function RoseSectionContent({ section, resume }: { section: any; resume: Resume 
             <div className="flex items-baseline justify-between">
               <h3 className="text-sm font-semibold" style={{ color: PRIMARY }}>{item.position}</h3>
               <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ backgroundColor: ROSE_50, color: ACCENT }}>
-                {item.startDate} &ndash; {item.current ? (resume.language === 'zh' ? '至今' : 'Present') : item.endDate}
+                {item.startDate} &ndash; {item.endDate || (item.current ? (resume.language === 'zh' ? '至今' : 'Present') : '')}
               </span>
             </div>
             {item.company && <p className="text-sm" style={{ color: ACCENT }}>{item.company}</p>}
@@ -121,7 +121,7 @@ function RoseSectionContent({ section, resume }: { section: any; resume: Resume 
           <div key={item.id} className="rounded-xl border p-4" style={{ borderColor: ROSE_100 }}>
             <div className="flex items-baseline justify-between">
               <h3 className="text-sm font-semibold" style={{ color: PRIMARY }}>{item.degree}{item.field ? ` in ${item.field}` : ''}</h3>
-              <span className="shrink-0 text-xs" style={{ color: ACCENT }}>{item.startDate} &ndash; {item.endDate}</span>
+              <span className="shrink-0 text-xs" style={{ color: ACCENT }}>{item.startDate} &ndash; {item.endDate || (resume.language === 'zh' ? '至今' : 'Present')}</span>
             </div>
             {item.institution && <p className="text-sm" style={{ color: ACCENT }}>{item.institution}</p>}
             {item.gpa && <p className="text-xs" style={{ color: '#a8a29e' }}>GPA: {item.gpa}</p>}

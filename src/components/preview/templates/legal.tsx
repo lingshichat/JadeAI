@@ -84,7 +84,7 @@ function LegalSectionContent({ section, resume }: { section: any; resume: Resume
                 {item.location && <span className="text-sm" style={{ color: MUTED }}> ({item.location})</span>}
               </div>
               <span className="shrink-0 text-xs italic" style={{ color: MUTED }}>
-                {item.startDate} - {item.current ? (resume.language === 'zh' ? '至今' : 'Present') : item.endDate}
+                {item.startDate} - {item.endDate || (item.current ? (resume.language === 'zh' ? '至今' : 'Present') : '')}
               </span>
             </div>
             {item.description && <p className="mt-1 text-sm" style={{ color: BODY_TEXT }}>{item.description}</p>}
@@ -118,7 +118,7 @@ function LegalSectionContent({ section, resume }: { section: any; resume: Resume
                 {item.location && <span className="text-sm" style={{ color: MUTED }}> ({item.location})</span>}
               </div>
               <span className="shrink-0 text-xs italic" style={{ color: MUTED }}>
-                {item.startDate} - {item.endDate}
+                {item.startDate} - {item.endDate || (resume.language === 'zh' ? '至今' : 'Present')}
               </span>
             </div>
             {item.gpa && <p className="text-xs" style={{ color: MUTED }}>GPA: {item.gpa}</p>}

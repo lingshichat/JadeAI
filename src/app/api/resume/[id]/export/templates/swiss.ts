@@ -21,7 +21,7 @@ function buildSwissSectionContent(section: Section, lang: string): string {
 
   if (section.type === 'work_experience') {
     return `<div class="space-y-4">${((c as WorkExperienceContent).items || []).map((it: any) => `<div class="grid grid-cols-[140px_1fr] gap-4">
-      <div class="text-xs" style="color:#71717a"><span>${esc(it.startDate)} &ndash; ${it.current ? (lang === 'zh' ? '至今' : 'Present') : esc(it.endDate)}</span></div>
+      <div class="text-xs" style="color:#71717a"><span>${esc(it.startDate)} &ndash; ${esc(it.endDate) || (it.current ? (lang === 'zh' ? '至今' : 'Present') : '')}</span></div>
       <div>
         <h3 class="text-sm font-bold" style="color:${TEXT}">${esc(it.position)}</h3>
         ${it.company ? `<p class="text-sm" style="color:${RED}">${esc(it.company)}</p>` : ''}
@@ -34,7 +34,7 @@ function buildSwissSectionContent(section: Section, lang: string): string {
 
   if (section.type === 'education') {
     return `<div class="space-y-3">${((c as EducationContent).items || []).map((it: any) => `<div class="grid grid-cols-[140px_1fr] gap-4">
-      <span class="text-xs" style="color:#71717a">${esc(it.startDate)} &ndash; ${esc(it.endDate)}</span>
+      <span class="text-xs" style="color:#71717a">${esc(it.startDate)} &ndash; ${esc(it.endDate) || (lang === 'zh' ? '至今' : 'Present')}</span>
       <div>
         <h3 class="text-sm font-bold" style="color:${TEXT}">${esc(it.degree)}${it.field ? ` in ${esc(it.field)}` : ''}</h3>
         ${it.institution ? `<p class="text-sm" style="color:${RED}">${esc(it.institution)}</p>` : ''}

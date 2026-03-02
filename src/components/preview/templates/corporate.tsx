@@ -74,7 +74,7 @@ function CorporateSectionContent({ section, resume }: { section: any; resume: Re
                 {item.location && <span className="text-sm text-slate-400">, {item.location}</span>}
               </div>
               <span className="shrink-0 rounded px-2 py-0.5 text-xs font-medium text-white" style={{ background: BLUE }}>
-                {item.startDate} - {item.current ? (resume.language === 'zh' ? '至今' : 'Present') : item.endDate}
+                {item.startDate} - {item.endDate || (item.current ? (resume.language === 'zh' ? '至今' : 'Present') : '')}
               </span>
             </div>
             {item.description && <p className="mt-1 text-sm text-slate-600">{item.description}</p>}
@@ -105,7 +105,7 @@ function CorporateSectionContent({ section, resume }: { section: any; resume: Re
                 {item.institution && <span className="text-sm text-slate-600"> - {item.institution}</span>}
                 {item.location && <span className="text-sm text-slate-400">, {item.location}</span>}
               </div>
-              <span className="shrink-0 text-xs text-slate-400">{item.startDate} - {item.endDate}</span>
+              <span className="shrink-0 text-xs text-slate-400">{item.startDate} - {item.endDate || (resume.language === 'zh' ? '至今' : 'Present')}</span>
             </div>
             {item.gpa && <p className="text-sm text-slate-500">GPA: {item.gpa}</p>}
             {item.highlights?.length > 0 && (

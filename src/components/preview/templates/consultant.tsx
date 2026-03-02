@@ -74,7 +74,7 @@ function ConsultantSectionContent({ section, resume }: { section: any; resume: R
                 {item.company && <span className="text-sm text-gray-500"> | {item.company}</span>}
                 {item.location && <span className="text-sm text-gray-400">, {item.location}</span>}
               </div>
-              <span className="shrink-0 text-xs font-medium" style={{ color: BLUE_600 }}>{item.startDate} - {item.current ? (resume.language === 'zh' ? '至今' : 'Present') : item.endDate}</span>
+              <span className="shrink-0 text-xs font-medium" style={{ color: BLUE_600 }}>{item.startDate} - {item.endDate || (item.current ? (resume.language === 'zh' ? '至今' : 'Present') : '')}</span>
             </div>
             {item.description && <p className="mt-1 text-sm text-gray-600">{item.description}</p>}
             {item.technologies?.length > 0 && (
@@ -107,7 +107,7 @@ function ConsultantSectionContent({ section, resume }: { section: any; resume: R
                 {item.institution && <span className="text-sm text-gray-500"> - {item.institution}</span>}
                 {item.location && <span className="text-sm text-gray-400">, {item.location}</span>}
               </div>
-              <span className="shrink-0 text-xs font-medium" style={{ color: BLUE_600 }}>{item.startDate} - {item.endDate}</span>
+              <span className="shrink-0 text-xs font-medium" style={{ color: BLUE_600 }}>{item.startDate} - {item.endDate || (resume.language === 'zh' ? '至今' : 'Present')}</span>
             </div>
             {item.gpa && <p className="text-sm text-gray-500">GPA: {item.gpa}</p>}
             {item.highlights?.length > 0 && (

@@ -87,7 +87,7 @@ function ScientistSectionContent({ section, resume }: { section: any; resume: Re
                 {item.company && <span className="text-sm" style={{ color: MUTED }}>, {item.company}</span>}
               </div>
               <span className="shrink-0 text-xs" style={{ color: MUTED }}>
-                {item.startDate} - {item.current ? (resume.language === 'zh' ? '至今' : 'Present') : item.endDate}
+                {item.startDate} - {item.endDate || (item.current ? (resume.language === 'zh' ? '至今' : 'Present') : '')}
               </span>
             </div>
             {item.description && <p className="mt-1 pl-6 text-sm" style={{ color: BODY_TEXT }}>{item.description}</p>}
@@ -124,7 +124,7 @@ function ScientistSectionContent({ section, resume }: { section: any; resume: Re
                 {item.institution && <span className="text-sm" style={{ color: MUTED }}>, {item.institution}</span>}
               </div>
               <span className="shrink-0 text-xs" style={{ color: MUTED }}>
-                {item.startDate} - {item.endDate}
+                {item.startDate} - {item.endDate || (resume.language === 'zh' ? '至今' : 'Present')}
               </span>
             </div>
             {item.gpa && <p className="pl-6 text-xs" style={{ color: MUTED }}>GPA: {item.gpa}</p>}

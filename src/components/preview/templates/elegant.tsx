@@ -66,7 +66,7 @@ function ElegantSectionContent({ section, lang }: { section: any; lang?: string 
                 <span className="text-sm font-bold" style={{ color: '#2c2c2c' }}>{item.position}</span>
                 {item.company && <span className="text-sm text-zinc-500"> — {item.company}</span>}
               </div>
-              <span className="shrink-0 text-xs italic text-zinc-400">{item.startDate} – {item.current ? (lang === 'zh' ? '至今' : 'Present') : item.endDate}</span>
+              <span className="shrink-0 text-xs italic text-zinc-400">{item.startDate} – {item.endDate || (item.current ? (lang === 'zh' ? '至今' : 'Present') : '')}</span>
             </div>
             {item.description && <p className="mt-1 text-sm text-zinc-600">{item.description}</p>}
             {item.technologies?.length > 0 && <p className="mt-0.5 text-xs text-zinc-400 italic">{lang === 'zh' ? '技术栈' : 'Tech'}: {item.technologies.join(', ')}</p>}
@@ -91,7 +91,7 @@ function ElegantSectionContent({ section, lang }: { section: any; lang?: string 
                 <span className="text-sm font-bold" style={{ color: '#2c2c2c' }}>{item.degree}{item.field ? ` in ${item.field}` : ''}</span>
                 {item.institution && <span className="text-sm text-zinc-500"> — {item.institution}</span>}
               </div>
-              <span className="shrink-0 text-xs italic text-zinc-400">{item.startDate} – {item.endDate}</span>
+              <span className="shrink-0 text-xs italic text-zinc-400">{item.startDate} – {item.endDate || (lang === 'zh' ? '至今' : 'Present')}</span>
             </div>
             {item.gpa && <p className="text-sm text-zinc-500">GPA: {item.gpa}</p>}
             {item.highlights?.length > 0 && (

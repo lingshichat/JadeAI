@@ -86,7 +86,7 @@ function AcademicSectionContent({ section, resume }: { section: any; resume: Res
                 {item.company && <span className="text-sm text-zinc-600">, {item.company}</span>}
                 {item.location && <span className="text-sm text-zinc-500">, {item.location}</span>}
               </div>
-              <span className="shrink-0 text-xs text-zinc-500">{item.startDate} – {item.current ? (resume.language === 'zh' ? '至今' : 'Present') : item.endDate}</span>
+              <span className="shrink-0 text-xs text-zinc-500">{item.startDate} – {item.endDate || (item.current ? (resume.language === 'zh' ? '至今' : 'Present') : '')}</span>
             </div>
             {item.description && <p className="mt-0.5 text-sm text-zinc-600">{item.description}</p>}
             {item.technologies?.length > 0 && (
@@ -116,7 +116,7 @@ function AcademicSectionContent({ section, resume }: { section: any; resume: Res
                 <span className="text-sm font-bold text-zinc-800">{item.degree}</span>
                 {item.field && <span className="text-sm text-zinc-600"> in {item.field}</span>}
               </div>
-              <span className="shrink-0 text-xs text-zinc-500">{item.startDate} – {item.endDate}</span>
+              <span className="shrink-0 text-xs text-zinc-500">{item.startDate} – {item.endDate || (resume.language === 'zh' ? '至今' : 'Present')}</span>
             </div>
             <p className="text-sm text-zinc-600">{item.institution}{item.location ? `, ${item.location}` : ''}</p>
             {item.gpa && <p className="text-xs text-zinc-500">GPA: {item.gpa}</p>}

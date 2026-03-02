@@ -103,7 +103,7 @@ function ArchitectSectionContent({ section, resume }: { section: any; resume: Re
                 className="shrink-0 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider"
                 style={{ fontFamily: 'JetBrains Mono, Consolas, monospace', color: MUTED, backgroundColor: GRID }}
               >
-                {item.startDate} - {item.current ? (resume.language === 'zh' ? '至今' : 'Present') : item.endDate}
+                {item.startDate} - {item.endDate || (item.current ? (resume.language === 'zh' ? '至今' : 'Present') : '')}
               </span>
             </div>
             {item.description && <p className="mt-1 text-sm" style={{ color: BODY_TEXT }}>{item.description}</p>}
@@ -150,7 +150,7 @@ function ArchitectSectionContent({ section, resume }: { section: any; resume: Re
                 {item.location && <span className="text-sm" style={{ color: MUTED }}>, {item.location}</span>}
               </div>
               <span className="shrink-0 text-xs" style={{ fontFamily: 'JetBrains Mono, Consolas, monospace', color: MUTED }}>
-                {item.startDate} - {item.endDate}
+                {item.startDate} - {item.endDate || (resume.language === 'zh' ? '至今' : 'Present')}
               </span>
             </div>
             {item.gpa && <p className="text-xs" style={{ color: MUTED }}>GPA: {item.gpa}</p>}

@@ -70,7 +70,7 @@ function NordicSectionContent({ section, resume }: { section: any; resume: Resum
                 <span className="text-sm font-medium" style={{ color: SLATE_500 }}>{item.position}</span>
                 {item.company && <span className="text-sm font-light" style={{ color: SLATE_400 }}> | {item.company}</span>}
               </div>
-              <span className="shrink-0 text-xs font-light" style={{ color: SLATE_400 }}>{item.startDate} - {item.current ? (resume.language === 'zh' ? '至今' : 'Present') : item.endDate}</span>
+              <span className="shrink-0 text-xs font-light" style={{ color: SLATE_400 }}>{item.startDate} - {item.endDate || (item.current ? (resume.language === 'zh' ? '至今' : 'Present') : '')}</span>
             </div>
             {item.description && <p className="mt-1 text-sm font-light" style={{ color: SLATE_500 }}>{item.description}</p>}
             {item.technologies?.length > 0 && (
@@ -99,7 +99,7 @@ function NordicSectionContent({ section, resume }: { section: any; resume: Resum
                 <span className="text-sm font-medium" style={{ color: SLATE_500 }}>{item.degree}{item.field ? ` in ${item.field}` : ''}</span>
                 {item.institution && <span className="text-sm font-light" style={{ color: SLATE_400 }}> - {item.institution}</span>}
               </div>
-              <span className="shrink-0 text-xs font-light" style={{ color: SLATE_400 }}>{item.startDate} - {item.endDate}</span>
+              <span className="shrink-0 text-xs font-light" style={{ color: SLATE_400 }}>{item.startDate} - {item.endDate || (resume.language === 'zh' ? '至今' : 'Present')}</span>
             </div>
             {item.gpa && <p className="text-xs font-light" style={{ color: SLATE_400 }}>GPA: {item.gpa}</p>}
             {item.highlights?.length > 0 && (

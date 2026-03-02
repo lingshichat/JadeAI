@@ -65,7 +65,7 @@ function FormalSectionContent({ section, resume }: { section: any; resume: Resum
                 {item.company && <span className="text-sm text-zinc-600">, {item.company}</span>}
                 {item.location && <span className="text-sm text-zinc-400"> ({item.location})</span>}
               </div>
-              <span className="shrink-0 text-xs italic text-zinc-400">{item.startDate} – {item.current ? (resume.language === 'zh' ? '至今' : 'Present') : item.endDate}</span>
+              <span className="shrink-0 text-xs italic text-zinc-400">{item.startDate} – {item.endDate || (item.current ? (resume.language === 'zh' ? '至今' : 'Present') : '')}</span>
             </div>
             {item.description && <p className="mt-1 text-sm text-zinc-600">{item.description}</p>}
             {item.technologies?.length > 0 && <p className="mt-0.5 text-xs text-zinc-400">{resume.language === 'zh' ? '技术栈' : 'Tech'}: {item.technologies.join(', ')}</p>}
@@ -90,7 +90,7 @@ function FormalSectionContent({ section, resume }: { section: any; resume: Resum
                 <span className="text-sm font-bold" style={{ color: DARK_GREEN }}>{item.institution}</span>
                 {item.location && <span className="text-sm text-zinc-400"> ({item.location})</span>}
               </div>
-              <span className="shrink-0 text-xs italic text-zinc-400">{item.startDate} – {item.endDate}</span>
+              <span className="shrink-0 text-xs italic text-zinc-400">{item.startDate} – {item.endDate || (resume.language === 'zh' ? '至今' : 'Present')}</span>
             </div>
             <p className="text-sm text-zinc-600">{item.degree}{item.field ? ` in ${item.field}` : ''}</p>
             {item.gpa && <p className="text-xs text-zinc-500">GPA: {item.gpa}</p>}

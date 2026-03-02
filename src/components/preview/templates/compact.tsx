@@ -151,7 +151,7 @@ function CompactRightContent({ section, resume }: { section: any; resume: Resume
                 {item.company && <span className="text-xs text-zinc-500"> | {item.company}</span>}
                 {item.location && <span className="text-xs text-zinc-400">, {item.location}</span>}
               </div>
-              <span className="shrink-0 text-[10px] text-zinc-400">{item.startDate} – {item.current ? (resume.language === 'zh' ? '至今' : 'Present') : item.endDate}</span>
+              <span className="shrink-0 text-[10px] text-zinc-400">{item.startDate} – {item.endDate || (item.current ? (resume.language === 'zh' ? '至今' : 'Present') : '')}</span>
             </div>
             {item.description && <p className="mt-0.5 text-xs text-zinc-600">{item.description}</p>}
             {item.technologies?.length > 0 && (
@@ -179,7 +179,7 @@ function CompactRightContent({ section, resume }: { section: any; resume: Resume
                 {item.institution && <span className="text-xs text-zinc-500"> — {item.institution}</span>}
                 {item.location && <span className="text-xs text-zinc-400">, {item.location}</span>}
               </div>
-              <span className="shrink-0 text-[10px] text-zinc-400">{item.startDate} – {item.endDate}</span>
+              <span className="shrink-0 text-[10px] text-zinc-400">{item.startDate} – {item.endDate || (resume.language === 'zh' ? '至今' : 'Present')}</span>
             </div>
             {item.gpa && <p className="text-[10px] text-zinc-500">GPA: {item.gpa}</p>}
             {item.highlights?.length > 0 && (

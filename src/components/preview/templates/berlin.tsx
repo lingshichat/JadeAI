@@ -92,7 +92,7 @@ function BerlinSectionContent({ section, lang }: { section: any; lang?: string }
           <div key={item.id} className="border-l-4 pl-4" style={{ borderColor: YELLOW }}>
             <div className="flex items-baseline justify-between">
               <h3 className="text-sm font-bold" style={{ color: TEXT }}>{item.position}</h3>
-              <span className="shrink-0 text-xs font-bold" style={{ color: BLUE }}>{item.startDate} &ndash; {item.current ? (lang === 'zh' ? '至今' : 'Present') : item.endDate}</span>
+              <span className="shrink-0 text-xs font-bold" style={{ color: BLUE }}>{item.startDate} &ndash; {item.endDate || (item.current ? (lang === 'zh' ? '至今' : 'Present') : '')}</span>
             </div>
             {item.company && <p className="text-sm font-semibold" style={{ color: BLUE }}>{item.company}{item.location ? `, ${item.location}` : ''}</p>}
             {item.description && <p className="mt-1 text-sm text-zinc-600">{item.description}</p>}
@@ -126,7 +126,7 @@ function BerlinSectionContent({ section, lang }: { section: any; lang?: string }
           <div key={item.id} className="border-l-4 pl-4" style={{ borderColor: BLUE }}>
             <div className="flex items-baseline justify-between">
               <h3 className="text-sm font-bold" style={{ color: TEXT }}>{item.degree}{item.field ? ` in ${item.field}` : ''}</h3>
-              <span className="shrink-0 text-xs" style={{ color: BLUE }}>{item.startDate} &ndash; {item.endDate}</span>
+              <span className="shrink-0 text-xs" style={{ color: BLUE }}>{item.startDate} &ndash; {item.endDate || (lang === 'zh' ? '至今' : 'Present')}</span>
             </div>
             {item.institution && <p className="text-sm font-semibold" style={{ color: YELLOW }}>{item.institution}{item.location ? `, ${item.location}` : ''}</p>}
             {item.gpa && <p className="text-xs text-zinc-500">GPA: {item.gpa}</p>}

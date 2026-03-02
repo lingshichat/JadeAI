@@ -75,7 +75,7 @@ function SwissSectionContent({ section, lang }: { section: any; lang?: string })
         {((content as WorkExperienceContent).items || []).map((item: any) => (
           <div key={item.id} className="grid grid-cols-[140px_1fr] gap-4">
             <div className="text-xs" style={{ color: '#52525b' }}>
-              <span>{item.startDate} &ndash; {item.current ? (lang === 'zh' ? '至今' : 'Present') : item.endDate}</span>
+              <span>{item.startDate} &ndash; {item.endDate || (item.current ? (lang === 'zh' ? '至今' : 'Present') : '')}</span>
             </div>
             <div>
               <h3 className="text-sm font-bold" style={{ color: TEXT }}>{item.position}</h3>
@@ -106,7 +106,7 @@ function SwissSectionContent({ section, lang }: { section: any; lang?: string })
       <div className="space-y-3">
         {((content as EducationContent).items || []).map((item: any) => (
           <div key={item.id} className="grid grid-cols-[140px_1fr] gap-4">
-            <span className="text-xs" style={{ color: '#52525b' }}>{item.startDate} &ndash; {item.endDate}</span>
+            <span className="text-xs" style={{ color: '#52525b' }}>{item.startDate} &ndash; {item.endDate || (lang === 'zh' ? '至今' : 'Present')}</span>
             <div>
               <h3 className="text-sm font-bold" style={{ color: TEXT }}>{item.degree}{item.field ? ` in ${item.field}` : ''}</h3>
               {item.institution && <p className="text-sm" style={{ color: RED }}>{item.institution}</p>}

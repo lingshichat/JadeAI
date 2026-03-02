@@ -86,7 +86,7 @@ function ModernSectionContent({ section, lang }: { section: any; lang?: string }
             <div className="flex items-baseline justify-between">
               <h3 className="text-sm font-semibold text-zinc-800">{item.position}</h3>
               <span className="shrink-0 rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs text-zinc-500">
-                {item.startDate} - {item.current ? (lang === 'zh' ? '至今' : 'Present') : item.endDate}
+                {item.startDate} - {item.endDate || (item.current ? (lang === 'zh' ? '至今' : 'Present') : '')}
               </span>
             </div>
             {item.company && <p className="text-sm" style={{ color: '#e94560' }}>{item.company}</p>}
@@ -116,7 +116,7 @@ function ModernSectionContent({ section, lang }: { section: any; lang?: string }
           <div key={item.id} className="border-l-2 pl-4" style={{ borderColor: '#0f3460' }}>
             <h3 className="text-sm font-semibold text-zinc-800">{item.institution}</h3>
             <p className="text-sm text-zinc-600">{item.degree} {item.field && `- ${item.field}`}</p>
-            <span className="text-xs text-zinc-400">{item.startDate} - {item.endDate}</span>
+            <span className="text-xs text-zinc-400">{item.startDate} - {item.endDate || (lang === 'zh' ? '至今' : 'Present')}</span>
             {item.gpa && <p className="mt-0.5 text-xs text-zinc-500">GPA: {item.gpa}</p>}
             {item.highlights?.length > 0 && (
               <ul className="mt-1 list-disc pl-4">

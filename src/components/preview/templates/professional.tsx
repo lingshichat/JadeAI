@@ -91,7 +91,7 @@ function ProfessionalSectionContent({ section, lang }: { section: any; lang?: st
                 {item.company && <span className="text-sm text-zinc-600"> — {item.company}</span>}
                 {item.location && <span className="text-sm text-zinc-400"> ({item.location})</span>}
               </div>
-              <span className="shrink-0 text-xs text-zinc-400 italic">{item.startDate} – {item.current ? (lang === 'zh' ? '至今' : 'Present') : item.endDate}</span>
+              <span className="shrink-0 text-xs text-zinc-400 italic">{item.startDate} – {item.endDate || (item.current ? (lang === 'zh' ? '至今' : 'Present') : '')}</span>
             </div>
             {item.description && <p className="mt-1 text-sm text-zinc-600">{item.description}</p>}
             {item.technologies?.length > 0 && (
@@ -121,7 +121,7 @@ function ProfessionalSectionContent({ section, lang }: { section: any; lang?: st
                 <span className="text-sm font-bold" style={{ color: '#1e3a5f' }}>{item.institution}</span>
                 {item.location && <span className="text-sm text-zinc-400"> ({item.location})</span>}
               </div>
-              <span className="shrink-0 text-xs text-zinc-400 italic">{item.startDate} – {item.endDate}</span>
+              <span className="shrink-0 text-xs text-zinc-400 italic">{item.startDate} – {item.endDate || (lang === 'zh' ? '至今' : 'Present')}</span>
             </div>
             <p className="text-sm text-zinc-600">{item.degree}{item.field ? ` in ${item.field}` : ''}</p>
             {item.gpa && <p className="text-xs text-zinc-500">GPA: {item.gpa}</p>}

@@ -107,7 +107,7 @@ function NeonSectionContent({ section, resume }: { section: any; resume: Resume 
             <div className="flex items-baseline justify-between">
               <h3 className="text-sm font-bold" style={{ color: CYAN }}>{item.position}</h3>
               <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ color: BG, backgroundColor: VIOLET, boxShadow: `0 0 8px ${VIOLET}40` }}>
-                {item.startDate} - {item.current ? (resume.language === 'zh' ? '至今' : 'Present') : item.endDate}
+                {item.startDate} - {item.endDate || (item.current ? (resume.language === 'zh' ? '至今' : 'Present') : '')}
               </span>
             </div>
             {item.company && <p className="text-sm font-medium" style={{ color: VIOLET }}>{item.company}</p>}
@@ -145,7 +145,7 @@ function NeonSectionContent({ section, resume }: { section: any; resume: Resume 
           <div key={item.id} className="rounded-lg p-4" style={{ border: `1px solid ${VIOLET}20`, backgroundColor: `${VIOLET}05` }}>
             <div className="flex items-baseline justify-between">
               <h3 className="text-sm font-bold" style={{ color: CYAN }}>{item.institution}</h3>
-              <span className="text-xs" style={{ color: TEXT_DIM }}>{item.startDate} - {item.endDate}</span>
+              <span className="text-xs" style={{ color: TEXT_DIM }}>{item.startDate} - {item.endDate || (resume.language === 'zh' ? '至今' : 'Present')}</span>
             </div>
             <p className="text-sm" style={{ color: TEXT }}>{item.degree}{item.field ? ` in ${item.field}` : ''}</p>
             {item.gpa && <p className="text-xs" style={{ color: VIOLET }}>GPA: {item.gpa}</p>}
