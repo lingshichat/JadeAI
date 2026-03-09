@@ -78,6 +78,18 @@ export const chatMessages = pgTable('chat_messages', {
   createdAt: integer('created_at').notNull().default(epochNow),
 });
 
+export const resumeShares = pgTable('resume_shares', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  resumeId: text('resume_id').notNull(),
+  token: text('token').notNull().unique(),
+  label: text('label').notNull().default(''),
+  password: text('password'),
+  viewCount: integer('view_count').notNull().default(0),
+  isActive: integer('is_active').notNull().default(1),
+  createdAt: integer('created_at').notNull().default(epochNow),
+  updatedAt: integer('updated_at').notNull().default(epochNow),
+});
+
 export const jdAnalyses = pgTable('jd_analyses', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   resumeId: text('resume_id').notNull(),

@@ -71,6 +71,18 @@ export const chatMessages = sqliteTable('chat_messages', {
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 });
 
+export const resumeShares = sqliteTable('resume_shares', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  resumeId: text('resume_id').notNull().references(() => resumes.id, { onDelete: 'cascade' }),
+  token: text('token').notNull().unique(),
+  label: text('label').notNull().default(''),
+  password: text('password'),
+  viewCount: integer('view_count').notNull().default(0),
+  isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+});
+
 export const jdAnalyses = sqliteTable('jd_analyses', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   resumeId: text('resume_id').notNull().references(() => resumes.id, { onDelete: 'cascade' }),

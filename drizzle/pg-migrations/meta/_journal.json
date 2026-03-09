@@ -15,6 +15,13 @@
       "when": 1772089337477,
       "tag": "0001_windy_skrulls",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1773025252460,
+      "tag": "0002_watery_mister_fear",
+      "breakpoints": true
     }
   ]
 }

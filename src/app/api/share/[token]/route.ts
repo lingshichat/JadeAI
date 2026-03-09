@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resumeRepository } from '@/lib/db/repositories/resume.repository';
-
-async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
-}
+import { shareRepository } from '@/lib/db/repositories/share.repository';
+import { hashPassword } from '@/lib/utils/share';
 
 export async function GET(
   request: NextRequest,
@@ -15,7 +9,44 @@ export async function GET(
 ) {
   try {
     const { token } = await params;
+    const password = request.nextUrl.searchParams.get('password');
 
+    // 1. Try new resume_shares table first
+    const share = await shareRepository.findByToken(token);
+    if (share) {
+      console.log('[share/token] found in resumeShares, isActive:', share.isActive, typeof share.isActive);
+      if (!share.isActive) {
+        return NextResponse.json({ error: 'This share link has been disabled' }, { status: 403 });
+      }
+
+      if (share.password) {
+        if (!password) {
+          return NextResponse.json(
+            { error: 'Password required', passwordRequired: true },
+            { status: 401 }
+          );
+        }
+        const hashedInput = await hashPassword(password);
+        if (hashedInput !== share.password) {
+          return NextResponse.json(
+            { error: 'Invalid password', passwordRequired: true },
+            { status: 401 }
+          );
+        }
+      }
+
+      await shareRepository.incrementViewCount(share.id);
+
+      const resume = await resumeRepository.findById(share.resumeId);
+      if (!resume) {
+        return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      }
+
+      const { userId, sharePassword, ...publicResume } = resume;
+      return NextResponse.json(publicResume);
+    }
+
+    // 2. Fallback to legacy resumes.shareToken
     const resume = await resumeRepository.findByShareToken(token);
     if (!resume) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
@@ -25,16 +56,13 @@ export async function GET(
       return NextResponse.json({ error: 'This resume is not shared' }, { status: 403 });
     }
 
-    // Check password if protected
     if (resume.sharePassword) {
-      const password = request.nextUrl.searchParams.get('password');
       if (!password) {
         return NextResponse.json(
           { error: 'Password required', passwordRequired: true },
           { status: 401 }
         );
       }
-
       const hashedInput = await hashPassword(password);
       if (hashedInput !== resume.sharePassword) {
         return NextResponse.json(
@@ -44,10 +72,8 @@ export async function GET(
       }
     }
 
-    // Increment view count
     await resumeRepository.incrementViewCount(resume.id);
 
-    // Return resume data without sensitive fields
     const { userId, sharePassword, ...publicResume } = resume;
     return NextResponse.json(publicResume);
   } catch (error) {
