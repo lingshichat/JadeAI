@@ -366,7 +366,7 @@ export async function generatePdf(html: string, options: PdfOptions = {}): Promi
     // Set viewport to A4 width before loading content for accurate layout
     await page.setViewport({ width: A4_WIDTH_PX, height: A4_HEIGHT_PX });
 
-    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 15000 });
+    await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 15000 });
 
     // Wait for web fonts (e.g. Noto Sans SC) to finish loading
     await page.evaluate(() => document.fonts.ready);
