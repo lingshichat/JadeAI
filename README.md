@@ -58,6 +58,31 @@ Build professional resumes with drag-and-drop editing, real-time AI optimization
 - **Theme Customization** — Colors, fonts, spacing, and margins with live preview
 - **Undo / Redo** — Full edit history (up to 50 steps)
 - **Auto Save** — Configurable interval (0.3s–5s), with manual save option
+- **Markdown Support** — Use Markdown syntax in text fields to format content (e.g., `**bold**` for **bold text**)
+
+### Markdown Formatting
+
+The following resume sections support Markdown syntax:
+
+| Section | Supported Fields |
+|---------|-----------------|
+| Summary | Content text |
+| Work Experience | Description, Highlights |
+| Education | Highlights |
+| Projects | Description, Highlights |
+| Custom Section | Description |
+| Languages | Description |
+| GitHub | Description |
+
+**Supported syntax:**
+
+```
+**bold text**    → bold
+`code text`      → inline code
+- item           → bullet list
+```
+
+> Skills, Certifications, and Personal Info fields do not support Markdown.
 
 ### AI Capabilities
 
