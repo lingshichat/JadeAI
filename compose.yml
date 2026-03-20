@@ -1,0 +1,13 @@
+name: jadeai
+
+services:
+  app:
+    container_name: jadeai
+    image: twwch/jadeai:latest
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:3000:3000"
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
