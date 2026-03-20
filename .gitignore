@@ -37,7 +37,10 @@ next-env.d.ts
 
 # database
 /data/
+/backups/*
+!/backups/.gitkeep
 
 .claude
+.opencode
 
 jadeai-data/*
