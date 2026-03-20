@@ -35,3 +35,36 @@ Customized JadeAI frontend Trellis specs from the current codebase, replaced tem
 ### Next Steps
 
 - None - task complete
+
+
+## Session 2: Bootstrap Trellis workflow and local Docker startup
+
+**Date**: 2026-03-20
+**Task**: Bootstrap Trellis workflow and local Docker startup
+
+### Summary
+
+Bootstrapped Trellis workflow files and customized frontend guidelines for JadeAI, updated project commit policy to allow AI commits after explicit authorization, and added local Docker startup helpers for self-hosted personal use via compose.yml and docker_run_local.sh.
+
+### Main Changes
+
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b888f5f` | (see git log) |
+| `a898682` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
