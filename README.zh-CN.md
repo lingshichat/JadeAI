@@ -229,24 +229,21 @@ NEXT_PUBLIC_AUTH_ENABLED=false
 > **AI 配置：** 无需服务端环境变量。每位用户在应用内的 **设置 > AI** 中自行配置 API Key、Base URL 和模型。
 >
 > **本地网页工具：** 现在 `pnpm dev` 会同时启动 Next.js 应用和本地 Exa Pool MCP sidecar。请在应用内 **设置 > AI > 网页工具** 中填写 Exa Pool 地址和 API Key；这些值只保存在当前浏览器，并会在每次请求时转发给本地 MCP sidecar。
+>
+> **本地快速启动：** 现在 `pnpm dev` 会在需要时自动从 `.env.example` 创建 `.env.local`、确保 `data/` 目录存在，然后直接拉起完整本地开发环境。数据库迁移和演示数据会在首次启动时自动准备好。
 
 查看 `.env.example` 了解所有可用选项（Google OAuth、PostgreSQL 等）。
 
-#### 初始化数据库并启动
+#### 启动本地开发环境
 
 ```bash
-# 生成并执行迁移
-pnpm db:generate
-pnpm db:migrate
-
-# （可选）填充示例数据
-pnpm db:seed
-
-# 启动开发服务器
+# 一条命令启动本地开发所需服务
 pnpm dev
 ```
 
 打开 [http://localhost:3000](http://localhost:3000)。
+
+如果你需要手动维护数据库，`pnpm db:migrate` 和 `pnpm db:seed` 仍然可用。
 
 ## 环境变量
 
@@ -268,7 +265,8 @@ pnpm dev
 
 | 命令 | 说明 |
 |------|------|
-| `pnpm dev` | 同时启动 Next.js 开发服务器和本地 Exa Pool MCP sidecar |
+| `pnpm dev` | 必要时自动引导本地环境，然后同时启动 Next.js 开发服务器和本地 Exa Pool MCP sidecar |
+| `pnpm dev:stack` | 不做引导，直接同时启动 Next.js 开发服务器和本地 Exa Pool MCP sidecar |
 | `pnpm dev:web` | 仅启动 Next.js 开发服务器 |
 | `pnpm dev:mcp` | 仅启动本地 Exa Pool MCP sidecar |
 | `pnpm build` | 生产构建 |

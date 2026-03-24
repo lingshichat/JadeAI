@@ -189,6 +189,8 @@ export function AIChatContent({ resumeId, hideTitle }: AIChatContentProps) {
       // Show a user-friendly message for common errors
       if (msg.includes('ETIMEDOUT') || msg.includes('Cannot connect')) {
         toast.error(t('errorMessage'), { description: 'API 连接超时，请检查网络或 API 配置' });
+      } else if (msg.includes('Type validation failed') || msg.includes('invalid completion payload')) {
+        toast.error(t('errorMessage'), { description: t('invalidProviderResponse') });
       } else if (msg.includes('No tool call found')) {
         toast.error(t('errorMessage'), { description: 'AI 模型返回了无效的工具调用，请重试' });
       } else {

@@ -84,9 +84,10 @@ cat .trellis/spec/frontend/type-safety.md          # For types
 
 **Backend Task**:
 ```bash
+cat .trellis/spec/backend/index.md             # Start here
+cat .trellis/spec/backend/api-guidelines.md         # For API patterns
 cat .trellis/spec/backend/database-guidelines.md   # For DB operations
-cat .trellis/spec/backend/type-safety.md           # For types
-cat .trellis/spec/backend/logging-guidelines.md    # For logging
+cat .trellis/spec/backend/auth-guidelines.md       # For auth
 ```
 
 ---
@@ -236,7 +237,7 @@ python3 ./.trellis/scripts/task.py create "<title>" --slug <task-name>
 
 **Project-specific checks**:
 - See `.trellis/spec/frontend/quality-guidelines.md` for frontend
-- See `.trellis/spec/backend/quality-guidelines.md` for backend
+- See `.trellis/spec/backend/api-guidelines.md` for backend API patterns
 
 ---
 

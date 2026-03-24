@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently -k --names app,mcp --prefix-colors blue,green \"pnpm dev:web\" \"pnpm dev:mcp\"",
+    "dev": "node scripts/dev-local.mjs",
+    "dev:stack": "concurrently -k --names app,mcp --prefix-colors blue,green \"pnpm dev:web\" \"pnpm dev:mcp\"",
     "dev:web": "next dev --turbopack",
     "dev:mcp": "node --import tsx src/lib/ai/mcp/exa-pool-server.ts",
     "build:export-css": "tsx scripts/build-export-css.ts",

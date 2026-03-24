@@ -10,6 +10,12 @@ export interface AIConfig {
   model: string;
 }
 
+interface OpenAICompatibleProviderErrorInfo {
+  code: string;
+  message: string;
+  status: number;
+}
+
 export function extractAIConfig(request: NextRequest): AIConfig {
   const provider = request.headers.get('x-provider') || 'openai';
   const apiKey = request.headers.get('x-api-key') || '';
@@ -18,14 +24,62 @@ export function extractAIConfig(request: NextRequest): AIConfig {
   return { provider, apiKey, baseURL, model };
 }
 
-function isOpenAICompatibleProviderError(payload: unknown): payload is {
-  choices: null;
-  base_resp?: { status_code?: number; status_msg?: string };
-} {
-  if (!payload || typeof payload !== 'object') return false;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
 
-  const record = payload as Record<string, unknown>;
-  return record.object === 'chat.completion' && record.choices === null && typeof record.base_resp === 'object';
+function getStringField(record: Record<string, unknown> | undefined, key: string): string | undefined {
+  if (!record) return undefined;
+  const value = record[key];
+  return typeof value === 'string' ? value : undefined;
+}
+
+function getNumericField(record: Record<string, unknown> | undefined, key: string): number | undefined {
+  if (!record) return undefined;
+  const value = record[key];
+  return typeof value === 'number' ? value : undefined;
+}
+
+function extractOpenAICompatibleProviderError(payload: unknown): OpenAICompatibleProviderErrorInfo | null {
+  if (!isRecord(payload)) return null;
+
+  const objectType = getStringField(payload, 'object');
+  const hasInvalidChoices =
+    typeof objectType === 'string'
+    && objectType.startsWith('chat.completion')
+    && (!Array.isArray(payload.choices) || payload.choices.length === 0);
+
+  if (!hasInvalidChoices) {
+    return null;
+  }
+
+  const baseResp = isRecord(payload.base_resp) ? payload.base_resp : undefined;
+  const nestedError = isRecord(payload.error) ? payload.error : undefined;
+  const statusCode =
+    getNumericField(baseResp, 'status_code')
+    ?? getNumericField(nestedError, 'status_code')
+    ?? getNumericField(payload, 'status');
+  const code =
+    getStringField(nestedError, 'code')
+    ?? (statusCode ? String(statusCode) : 'invalid_chat_completion_payload');
+  const message =
+    getStringField(baseResp, 'status_msg')
+    ?? getStringField(nestedError, 'message')
+    ?? getStringField(payload, 'message')
+    ?? getStringField(payload, 'msg')
+    ?? 'The upstream OpenAI-compatible provider returned an invalid completion payload.';
+  const status =
+    statusCode === 2062
+      ? 429
+      : statusCode && statusCode >= 400 && statusCode < 600
+        ? statusCode
+        : 502;
+
+  return {
+    code,
+    message,
+    status,
+  };
 }
 
 async function openAICompatibleFetch(
@@ -50,24 +104,21 @@ async function openAICompatibleFetch(
     return response;
   }
 
-  if (!isOpenAICompatibleProviderError(payload)) {
+  const providerError = extractOpenAICompatibleProviderError(payload);
+  if (!providerError) {
     return response;
   }
-
-  const statusCode = payload.base_resp?.status_code;
-  const statusMessage = payload.base_resp?.status_msg || 'The upstream OpenAI-compatible provider returned an invalid completion payload.';
-  const translatedStatus = statusCode === 2062 ? 429 : 502;
 
   return new Response(
     JSON.stringify({
       error: {
-        message: statusMessage,
+        message: providerError.message,
         type: 'provider_error',
-        code: statusCode ? String(statusCode) : 'invalid_chat_completion_payload',
+        code: providerError.code,
       },
     }),
     {
-      status: translatedStatus,
+      status: providerError.status,
       headers: {
         'Content-Type': 'application/json',
       },

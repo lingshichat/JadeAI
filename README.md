@@ -229,24 +229,21 @@ NEXT_PUBLIC_AUTH_ENABLED=false
 > **AI Configuration:** No server-side env vars needed. Each user configures their own API Key, Base URL, and Model in **Settings > AI** within the app.
 >
 > **Local Web Tools:** `pnpm dev` now starts both the Next.js app and the local Exa Pool MCP sidecar. Configure your Exa Pool Base URL and API Key inside **Settings > AI > Web Tools**. Those values stay in the current browser and are forwarded to the local MCP sidecar per request.
+>
+> **Quick local start:** `pnpm dev` now creates `.env.local` from `.env.example` when needed, ensures the `data/` directory exists, and then starts the full local dev stack. Database migrations and demo data are prepared automatically on first launch.
 
 See `.env.example` for all available options (Google OAuth, PostgreSQL, etc.).
 
-#### Initialize Database & Run
+#### Start Local Development
 
 ```bash
-# Generate and run migrations
-pnpm db:generate
-pnpm db:migrate
-
-# (Optional) Seed with sample data
-pnpm db:seed
-
-# Start dev server
+# Start everything needed for local development
 pnpm dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
+
+If you need manual database maintenance, `pnpm db:migrate` and `pnpm db:seed` are still available.
 
 ## Environment Variables
 
@@ -268,7 +265,8 @@ Open [http://localhost:3000](http://localhost:3000).
 
 | Command | Description |
 |---------|-------------|
-| `pnpm dev` | Start the Next.js dev server and local Exa Pool MCP sidecar |
+| `pnpm dev` | Bootstrap local env if needed, then start the Next.js dev server and local Exa Pool MCP sidecar |
+| `pnpm dev:stack` | Start the Next.js dev server and local Exa Pool MCP sidecar without bootstrap |
 | `pnpm dev:web` | Start only the Next.js dev server |
 | `pnpm dev:mcp` | Start only the local Exa Pool MCP sidecar |
 | `pnpm build` | Production build |

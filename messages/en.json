@@ -237,6 +237,7 @@
     "apiKeyMissing": "API Key Not Configured",
     "apiKeyMissingHint": "Please configure your AI API Key in Settings before using AI features.",
     "apiKeyMissingBubble": "API Key not configured. Go to Settings.",
+    "invalidProviderResponse": "The model service returned a response that is not OpenAI-compatible. Check the Base URL, model name, or switch to a compatible provider and try again.",
     "goToSettings": "Go to Settings"
   },
   "pdf": {
