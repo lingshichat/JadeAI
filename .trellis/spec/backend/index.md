@@ -28,6 +28,7 @@ new ones.
 
 | Guide | Description | Status |
 |-------|-------------|--------|
+| [AI Backend Guidelines](./ai-guidelines.md) | AI route contracts, provider headers, tools, streaming, persistence | Customized |
 | [API Guidelines](./api-guidelines.md) | Route handler patterns, request validation, error handling | Customized |
 | [Database Guidelines](./database-guidelines.md) | Drizzle schema, repository pattern, migrations | Customized |
 | [Auth Guidelines](./auth-guidelines.md) | NextAuth config, fingerprint auth, middleware | Customized |

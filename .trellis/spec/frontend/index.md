@@ -19,6 +19,8 @@ inventing new ones.
 
 | Guide | Description | Status |
 |-------|-------------|--------|
+| [AI Experience Guidelines](./ai-experience-guidelines.md) | Chat, specialist dialogs, session UX, AI interaction coordination | Customized |
+| [Visual Design Guidelines](./visual-design-guidelines.md) | Current visual language, accent rules, motion, page-type coordination | Customized |
 | [Directory Structure](./directory-structure.md) | Module organization and file layout | Customized |
 | [Component Guidelines](./component-guidelines.md) | Component patterns, props, composition | Customized |
 | [Hook Guidelines](./hook-guidelines.md) | Custom hooks, data fetching patterns | Customized |
@@ -32,8 +34,9 @@ inventing new ones.
 
 1. Read this index before starting frontend work.
 2. Open the specific guide that matches the change you are about to make.
-3. Follow the documented examples before introducing a new pattern.
-4. Update these files when the project establishes a new convention.
+3. If the work changes visible UI, also read `visual-design-guidelines.md`.
+4. Follow the documented examples before introducing a new pattern.
+5. Update these files when the project establishes a new convention.
 
 ---
 

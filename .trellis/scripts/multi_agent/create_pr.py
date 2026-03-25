@@ -11,9 +11,8 @@ This script:
 3. Creates a Draft PR using `gh pr create`
 4. Updates task.json with status="completed", pr_url, and current_phase
 
-Note: This is the default automated path that performs git commit at the end of
-the pipeline. Direct AI commits outside this flow should still require explicit
-user authorization.
+Note: This is the only action that performs git commit, as it's the final
+step after all implementation and checks are complete.
 """
 
 from __future__ import annotations

@@ -64,6 +64,8 @@ Patterns to copy:
   animations in `src/app/globals.css`.
 - Use CSS variables and theme-aware classes for light/dark support instead of
   duplicating separate component stylesheets.
+- Keep visible UI aligned with `visual-design-guidelines.md`, especially for
+  accent usage, radius, shadow, and motion intensity.
 
 Examples:
 
@@ -71,6 +73,19 @@ Examples:
 - `src/components/dashboard/resume-card.tsx`: component-level Tailwind classes
   with conditional interaction styling.
 - `src/app/globals.css`: shared tokens, animation helpers, and AI markdown rules.
+
+### Visual Coordination
+
+- Product surfaces such as dashboard, editor, dialogs, and settings should stay
+  restrained and zinc-led.
+- Pink is the primary accent family for CTA, selection, and AI emphasis.
+- Landing sections may be more atmospheric, but should still feel like the same
+  product family.
+- AI surfaces may be slightly more expressive than dashboard surfaces, but they
+  should not introduce a separate brand language.
+
+Before inventing a new component treatment, check whether an adjacent feature
+already uses a compatible card, badge, button, or panel pattern.
 
 ---
 
@@ -108,3 +123,5 @@ Preferred direction for new code:
   rename inputs, or card navigation.
 - Putting heavy data-fetching logic into presentational leaf components instead
   of a route component, hook, or store.
+- Introducing a new accent color, radius system, or motion style that breaks
+  coordination with existing dashboard/editor/AI surfaces.

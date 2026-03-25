@@ -1,16 +1,11 @@
 ---
 name: record-session
-description: "Record work progress after code has been tested and committed"
+description: "Record work progress after human has tested and committed code"
 ---
 
-[!] **Prerequisite**: This skill should only be used AFTER the code has been tested and committed.
+[!] **Prerequisite**: This skill should only be used AFTER the human has tested and committed the code.
 
-By default, the human creates the commit. AI may also create the commit when the
-user explicitly authorized it for the current changes.
-
-This skill does not itself require a new commit. It should normally only read
-history (`git log`, `git status`, `git diff`) and record work that already has a
-commit hash.
+**Do NOT run `git commit` directly** — the scripts below handle their own commits for `.trellis/` metadata. You only need to read git history (`git log`, `git status`, `git diff`) and run the Python scripts.
 
 ---
 

@@ -12,6 +12,9 @@ behavior that would otherwise be duplicated across route components.
 Hooks are responsible for orchestration, not rendering. They return state and
 actions, and they often coordinate one or more Zustand stores.
 
+If the hook powers AI chat, session history, or specialist-to-chat coordination,
+also follow `ai-experience-guidelines.md`.
+
 ---
 
 ## Custom Hook Patterns
@@ -34,6 +37,8 @@ Examples:
 - `src/hooks/use-ai-chat.ts`: configures the AI SDK transport, merges local-only
   messages with server-backed chat state, and reloads resume data after tool
   results appear.
+- `src/hooks/use-message-pagination.ts`: preserves session continuity while
+  loading older AI messages and restoring scroll position.
 - `src/hooks/use-auth.ts`: hides whether auth comes from OAuth or fingerprint mode.
 
 ---
@@ -49,6 +54,9 @@ Examples:
   `DefaultChatTransport`, not ad hoc streaming code.
 - When server updates can happen outside the normal local mutation flow, perform
   an explicit reload. `use-ai-chat.ts` does this after tool outputs.
+- AI session history should stay hook-driven. Prefer extending
+  `useMessagePagination` / `useAIChat` instead of rebuilding pagination and
+  message merging logic inside components.
 
 ---
 
@@ -74,3 +82,5 @@ Examples:
 - Returning ambiguous tuple values instead of named fields.
 - Using a custom hook for one-off view logic that should stay as local state in a
   single component.
+- Re-implementing AI chat session/history orchestration in UI components instead
+  of extending the existing AI hooks.

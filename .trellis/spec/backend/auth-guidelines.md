@@ -71,9 +71,9 @@ in route handlers.
 
 ### `getUserIdFromRequest(request: Request): string | null`
 
-Reads the `x-fingerprint` header. In fingerprint/anonymous mode this contains
-the browser fingerprint. In OAuth mode it returns `null` (session is handled
-by NextAuth cookies).
+Reads the `x-fingerprint` header only. In fingerprint/anonymous mode this
+contains the browser fingerprint. In OAuth mode it normally returns `null`;
+session resolution happens later inside `resolveUser()`.
 
 ```typescript
 export function getUserIdFromRequest(request: Request): string | null {
@@ -168,6 +168,10 @@ export const config = {
 API routes are **excluded** from middleware auth — each route handler performs
 its own auth check via `resolveUser`.
 
+> **Warning**: Middleware only checks that a NextAuth session token cookie is
+> present. Authorization still happens inside each route handler via
+> `resolveUser()` and resource ownership checks.
+
 ---
 
 ## Auth Handler Route
@@ -228,3 +232,5 @@ When a user signs in with Google:
 - In OAuth mode, relying on the fingerprint header instead of the session cookie
 - Creating a new NextAuth handler route instead of reusing the existing
   `src/app/api/auth/[...nextauth]/route.ts`
+- Assuming `getUserIdFromRequest()` can identify OAuth users by itself; in OAuth
+  mode it is only a passthrough for fingerprint-based requests
