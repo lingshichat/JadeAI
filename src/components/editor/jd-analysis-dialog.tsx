@@ -29,7 +29,10 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { useEditorStore } from '@/stores/editor-store';
+import { useResumeStore } from '@/stores/resume-store';
+import { useUIStore } from '@/stores/ui-store';
 import { getAIHeaders } from '@/stores/settings-store';
+import { ResumeTargetBadge } from '@/components/resume/resume-target-badge';
 
 interface JdAnalysisResult {
   overallScore: number;
@@ -124,7 +127,15 @@ function formatDate(value: string | number): string {
 }
 
 /* ── Result view (shared between new analysis & history detail) ── */
-function JdAnalysisResultView({ result, jobDescription, t }: { result: JdAnalysisResult; jobDescription?: string; t: any }) {
+function JdAnalysisResultView({
+  result,
+  jobDescription,
+  t,
+}: {
+  result: JdAnalysisResult;
+  jobDescription?: string;
+  t: (key: string) => string;
+}) {
   const [jdExpanded, setJdExpanded] = useState(false);
 
   return (
@@ -266,7 +277,10 @@ function JdAnalysisResultView({ result, jobDescription, t }: { result: JdAnalysi
 export function JdAnalysisDialog({ open, onOpenChange, resumeId }: JdAnalysisDialogProps) {
   const t = useTranslations('jdAnalysis');
   const ct = useTranslations('common');
+  const vt = useTranslations('jdVersion');
   const { setShowAiChat, setPendingAiMessage } = useEditorStore();
+  const currentResume = useResumeStore((state) => state.currentResume);
+  const openModal = useUIStore((state) => state.openModal);
   const [jobDescription, setJobDescription] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<JdAnalysisResult | null>(null);
@@ -332,8 +346,8 @@ export function JdAnalysisDialog({ open, onOpenChange, resumeId }: JdAnalysisDia
       setResult(data);
       // Refresh history count
       fetchHistory();
-    } catch (err: any) {
-      setError(err.message || 'Failed to analyze');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to analyze');
     } finally {
       setIsAnalyzing(false);
     }
@@ -420,6 +434,40 @@ export function JdAnalysisDialog({ open, onOpenChange, resumeId }: JdAnalysisDia
           <TabsContent value="new" className="flex flex-col min-h-0">
             {!result ? (
               <div className="px-6 py-4 space-y-4">
+                {!currentResume?.targetJobTitle ? (
+                  <div className="flex flex-col gap-3 rounded-xl border border-pink-200 bg-pink-50/70 p-4 dark:border-pink-900/60 dark:bg-pink-950/20">
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                        {vt('recommendedTitle')}
+                      </p>
+                      <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+                        {vt('recommendedDescription')}
+                      </p>
+                    </div>
+                    <div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="cursor-pointer border-pink-200 text-pink-700 hover:bg-pink-100 hover:text-pink-800 dark:border-pink-900/60 dark:text-pink-200 dark:hover:bg-pink-950/40"
+                        onClick={() => openModal('create-jd-version')}
+                      >
+                        {vt('createAction')}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-4 dark:border-zinc-800 dark:bg-zinc-900/70">
+                    <p className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                      {vt('currentVersionLabel')}
+                    </p>
+                    <ResumeTargetBadge
+                      targetJobTitle={currentResume.targetJobTitle}
+                      targetCompany={currentResume.targetCompany}
+                      className="mt-2 w-fit"
+                    />
+                  </div>
+                )}
+
                 <Textarea
                   placeholder={t('placeholder')}
                   value={jobDescription}

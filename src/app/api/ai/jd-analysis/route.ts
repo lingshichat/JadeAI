@@ -69,6 +69,8 @@ export async function POST(request: NextRequest) {
       const saved = await analysisRepository.createJdAnalysis({
         resumeId,
         jobDescription,
+        targetJobTitle: resume.targetJobTitle ?? null,
+        targetCompany: resume.targetCompany ?? null,
         result: analysisData,
         overallScore: analysisData.overallScore,
         atsScore: analysisData.atsScore,

@@ -13,7 +13,8 @@
     "back": "Back",
     "search": "Search",
     "noData": "No data",
-    "rename": "Rename"
+    "rename": "Rename",
+    "close": "Close"
   },
   "auth": {
     "login": "Log in",
@@ -122,6 +123,7 @@
       "save": "Save",
       "exportPdf": "Export",
       "exporting": "Exporting...",
+      "createJdVersion": "JD Version",
       "jdAnalysis": "JD Match",
       "translate": "Translate",
       "coverLetter": "Cover Letter",
@@ -355,6 +357,26 @@
     "viewDetail": "View Details",
     "loadingHistory": "Loading history...",
     "jobDescriptionLabel": "Job Description"
+  },
+  "jdVersion": {
+    "title": "Create JD Version",
+    "description": "Create an independent copy from the current resume, add a job label, and keep JD matching work separate from the original.",
+    "createAction": "Create JD Version",
+    "sourceResume": "Source Resume",
+    "targetJobTitle": "Target Role",
+    "targetJobTitlePlaceholder": "e.g. Senior Frontend Engineer",
+    "targetCompany": "Target Company (Optional)",
+    "targetCompanyPlaceholder": "e.g. ByteDance",
+    "previewTitle": "New Copy Title",
+    "independentHint": "This creates an independent copy from the current resume so the original stays untouched.",
+    "createButton": "Create Copy",
+    "creating": "Creating...",
+    "success": "JD version created",
+    "error": "Failed to create JD version. Please try again.",
+    "missingJobTitle": "Please enter the target role first",
+    "recommendedTitle": "Create a JD version before analyzing",
+    "recommendedDescription": "Creating a labeled copy before JD matching keeps the main resume safe and fits high-volume application workflows better.",
+    "currentVersionLabel": "Current version under analysis"
   },
   "translate": {
     "title": "AI Resume Translation",

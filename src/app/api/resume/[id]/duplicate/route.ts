@@ -1,6 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod/v4';
 import { resumeRepository } from '@/lib/db/repositories/resume.repository';
 import { resolveUser, getUserIdFromRequest } from '@/lib/auth/helpers';
+
+const duplicateResumeInputSchema = z.object({
+  title: z.string().trim().min(1).max(120).optional(),
+  targetJobTitle: z.string().trim().min(1).max(120).nullable().optional(),
+  targetCompany: z.string().trim().min(1).max(120).nullable().optional(),
+}).superRefine((value, ctx) => {
+  if (value.targetCompany && !value.targetJobTitle) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['targetJobTitle'],
+      message: 'targetJobTitle is required when targetCompany is provided',
+    });
+  }
+});
 
 export async function POST(
   request: NextRequest,
@@ -22,7 +37,26 @@ export async function POST(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const duplicated = await resumeRepository.duplicate(id, user.id);
+    const rawBody = await request.text();
+    let body: unknown = {};
+
+    if (rawBody.trim()) {
+      try {
+        body = JSON.parse(rawBody);
+      } catch {
+        return NextResponse.json({ error: 'Invalid input' }, { status: 400 });
+      }
+    }
+
+    const parsed = duplicateResumeInputSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Invalid input', details: parsed.error.issues },
+        { status: 400 }
+      );
+    }
+
+    const duplicated = await resumeRepository.duplicate(id, user.id, parsed.data);
     return NextResponse.json(duplicated, { status: 201 });
   } catch (error) {
     console.error('POST /api/resume/[id]/duplicate error:', error);

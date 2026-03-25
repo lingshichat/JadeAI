@@ -81,11 +81,15 @@ export function useResume() {
     return false;
   }, []);
 
-  const duplicateResume = useCallback(async (id: string) => {
+  const duplicateResume = useCallback(async (
+    id: string,
+    options?: { title?: string; targetJobTitle?: string | null; targetCompany?: string | null }
+  ) => {
     try {
       const res = await fetch(`/api/resume/${id}/duplicate`, {
         method: 'POST',
         headers: getHeaders(),
+        ...(options ? { body: JSON.stringify(options) } : {}),
       });
       if (res.ok) {
         const resume = await res.json();

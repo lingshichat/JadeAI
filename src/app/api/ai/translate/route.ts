@@ -7,6 +7,9 @@ import { translateInputSchema } from '@/lib/ai/translate-schema';
 import { extractJson } from '@/lib/ai/extract-json';
 import { z } from 'zod/v4';
 
+type ResumeWithSections = NonNullable<Awaited<ReturnType<typeof resumeRepository.findById>>>;
+type ResumeSectionRecord = ResumeWithSections['sections'][number];
+
 const LANGUAGE_NAMES: Record<string, string> = {
   zh: 'Simplified Chinese',
   en: 'English',
@@ -124,12 +127,12 @@ export async function POST(request: NextRequest) {
 
     // In copy mode, duplicate the resume first and translate the copy
     let targetResumeId = resumeId;
-    let workingSections = resume.sections;
+    let workingSections: ResumeSectionRecord[] = resume.sections;
     let newResumeId: string | undefined;
 
     if (mode === 'copy') {
       const newTitle = `${resume.title}-${LANGUAGE_NAMES[targetLanguage] || targetLanguage}`;
-      const duplicated = await resumeRepository.duplicate(resumeId, user.id, newTitle);
+      const duplicated = await resumeRepository.duplicate(resumeId, user.id, { title: newTitle });
       if (!duplicated) {
         return new Response(JSON.stringify({ error: 'Failed to duplicate resume' }), { status: 500 });
       }
@@ -139,7 +142,7 @@ export async function POST(request: NextRequest) {
     }
 
     const allSections = sectionIds
-      ? workingSections.filter((s: any) => sectionIds.includes(s.id))
+      ? workingSections.filter((section) => sectionIds.includes(section.id))
       : workingSections;
 
     if (allSections.length === 0) {
@@ -150,9 +153,9 @@ export async function POST(request: NextRequest) {
     // Save stripped fields so we can merge them back after translation
     const strippedFields = new Map<string, Record<string, unknown>>();
 
-    const sectionsData = allSections.map((s: any) => {
-      const fieldsToStrip = STRIP_FIELDS[s.type];
-      let content = s.content;
+    const sectionsData = allSections.map((section) => {
+      const fieldsToStrip = STRIP_FIELDS[section.type];
+      let content = section.content;
 
       if (fieldsToStrip && content && typeof content === 'object') {
         const saved: Record<string, unknown> = {};
@@ -164,14 +167,14 @@ export async function POST(request: NextRequest) {
           }
         }
         if (Object.keys(saved).length > 0) {
-          strippedFields.set(s.id, saved);
+          strippedFields.set(section.id, saved);
         }
       }
 
       return {
-        sectionId: s.id,
-        type: s.type,
-        title: s.title,
+        sectionId: section.id,
+        type: section.type,
+        title: section.title,
         content,
       };
     });
@@ -244,9 +247,10 @@ export async function POST(request: NextRequest) {
         // Always send done and close — even if something above threw
         try {
           const updatedResume = await resumeRepository.findById(targetResumeId);
+          const updatedResumeSections = updatedResume?.sections as ResumeSectionRecord[] | undefined;
           const updatedSections = sectionIds
-            ? updatedResume?.sections.filter((s: any) => sectionIds.includes(s.id))
-            : updatedResume?.sections;
+            ? updatedResumeSections?.filter((section) => sectionIds.includes(section.id))
+            : updatedResumeSections;
 
           send({
             type: 'done',

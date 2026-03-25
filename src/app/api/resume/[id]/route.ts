@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { resumeRepository } from '@/lib/db/repositories/resume.repository';
 import { resolveUser, getUserIdFromRequest } from '@/lib/auth/helpers';
 
+type ResumeSectionInput = {
+  id: string;
+  type: string;
+  title: string;
+  sortOrder: number;
+  visible: boolean;
+  content: unknown;
+};
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -49,23 +58,38 @@ export async function PUT(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const body = await request.json();
-    const { title, template, themeConfig, sections } = body;
+    const body = await request.json() as {
+      title?: string;
+      template?: string;
+      themeConfig?: unknown;
+      sections?: ResumeSectionInput[];
+      targetJobTitle?: string | null;
+      targetCompany?: string | null;
+    };
+    const { title, template, themeConfig, sections, targetJobTitle, targetCompany } = body;
 
     // Update resume metadata
-    if (title || template || themeConfig) {
+    if (
+      title !== undefined ||
+      template !== undefined ||
+      themeConfig !== undefined ||
+      targetJobTitle !== undefined ||
+      targetCompany !== undefined
+    ) {
       await resumeRepository.update(id, {
-        ...(title && { title }),
-        ...(template && { template }),
-        ...(themeConfig && { themeConfig }),
+        ...(title !== undefined ? { title } : {}),
+        ...(template !== undefined ? { template } : {}),
+        ...(themeConfig !== undefined ? { themeConfig } : {}),
+        ...(targetJobTitle !== undefined ? { targetJobTitle } : {}),
+        ...(targetCompany !== undefined ? { targetCompany } : {}),
       });
     }
 
     // Sync sections: create new, update existing, delete removed
     if (sections && Array.isArray(sections)) {
-      const existingSections = resume.sections || [];
-      const existingIds = new Set(existingSections.map((s: any) => s.id));
-      const incomingIds = new Set(sections.map((s: any) => s.id));
+      const existingSections: Array<{ id: string }> = resume.sections || [];
+      const existingIds = new Set(existingSections.map((section) => section.id));
+      const incomingIds = new Set(sections.map((section) => section.id));
 
       // Delete sections that were removed by the user
       for (const existing of existingSections) {

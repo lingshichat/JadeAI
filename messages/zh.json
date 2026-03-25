@@ -13,7 +13,8 @@
     "back": "返回",
     "search": "搜索",
     "noData": "暂无数据",
-    "rename": "重命名"
+    "rename": "重命名",
+    "close": "关闭"
   },
   "auth": {
     "login": "登录",
@@ -122,6 +123,7 @@
       "save": "保存",
       "exportPdf": "导出",
       "exporting": "导出中...",
+      "createJdVersion": "JD 版本",
       "jdAnalysis": "JD 匹配",
       "translate": "翻译",
       "coverLetter": "求职信",
@@ -355,6 +357,26 @@
     "viewDetail": "查看详情",
     "loadingHistory": "加载历史...",
     "jobDescriptionLabel": "职位描述"
+  },
+  "jdVersion": {
+    "title": "创建 JD 版本",
+    "description": "基于当前简历创建独立副本，并添加岗位标签，后续可以单独做 JD 匹配与优化。",
+    "createAction": "创建 JD 版本",
+    "sourceResume": "当前基础简历",
+    "targetJobTitle": "目标岗位",
+    "targetJobTitlePlaceholder": "例如：高级前端工程师",
+    "targetCompany": "目标公司（可选）",
+    "targetCompanyPlaceholder": "例如：字节跳动",
+    "previewTitle": "新副本标题",
+    "independentHint": "会基于当前简历创建一个独立副本，避免误改原简历。",
+    "createButton": "创建副本",
+    "creating": "创建中...",
+    "success": "JD 版本已创建",
+    "error": "创建 JD 版本失败，请重试",
+    "missingJobTitle": "请先填写目标岗位",
+    "recommendedTitle": "建议先在 JD 版本上分析",
+    "recommendedDescription": "先创建带岗位标签的独立副本，再做 JD 匹配和优化，更适合海投场景，也能保护主简历。",
+    "currentVersionLabel": "当前正在分析的版本"
   },
   "translate": {
     "title": "AI 简历翻译",

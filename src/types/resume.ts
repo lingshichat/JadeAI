@@ -184,6 +184,8 @@ export interface Resume {
   themeConfig: ThemeConfig;
   isDefault: boolean;
   language: string;
+  targetJobTitle?: string | null;
+  targetCompany?: string | null;
   sections: ResumeSection[];
   createdAt: Date;
   updatedAt: Date;

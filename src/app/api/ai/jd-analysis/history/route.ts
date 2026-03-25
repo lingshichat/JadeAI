@@ -3,6 +3,8 @@ import { resolveUser, getUserIdFromRequest } from '@/lib/auth/helpers';
 import { resumeRepository } from '@/lib/db/repositories/resume.repository';
 import { analysisRepository } from '@/lib/db/repositories/analysis.repository';
 
+type JdAnalysisHistoryRow = Awaited<ReturnType<typeof analysisRepository.findJdAnalysesByResumeId>>[number];
+
 export async function GET(request: NextRequest) {
   try {
     const fingerprint = getUserIdFromRequest(request);
@@ -36,11 +38,13 @@ export async function GET(request: NextRequest) {
     // List all
     const analyses = await analysisRepository.findJdAnalysesByResumeId(resumeId);
 
-    const list = analyses.map((a: any) => ({
+    const list = analyses.map((a: JdAnalysisHistoryRow) => ({
       id: a.id,
       overallScore: a.overallScore,
       atsScore: a.atsScore,
       jobDescription: a.jobDescription.slice(0, 100),
+      targetJobTitle: a.targetJobTitle ?? null,
+      targetCompany: a.targetCompany ?? null,
       createdAt: a.createdAt,
     }));
 

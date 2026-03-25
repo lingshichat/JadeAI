@@ -25,8 +25,10 @@ import { ImportJsonDialog } from '@/components/dashboard/import-json-dialog';
 import { ShareDialog } from '@/components/editor/share-dialog';
 import { SettingsDialog } from '@/components/settings/settings-dialog';
 import { TourOverlay, type TourStepConfig } from '@/components/tour/tour-overlay';
+import { CreateJdVersionDialog } from '@/components/resume/create-jd-version-dialog';
 import { useTourStore, hasCompletedTour } from '@/stores/tour-store';
 import { cn } from '@/lib/utils';
+import { getResumeTargetLabel } from '@/lib/resume-target';
 import { useRouter } from '@/i18n/routing';
 import type { Resume } from '@/types/resume';
 
@@ -77,8 +79,9 @@ export default function DashboardPage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOption, setSortOption] = useState<SortOption>('lastEdited');
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [viewMode, setViewMode] = useState<ViewMode>(() => getInitialView());
   const [shareResumeId, setShareResumeId] = useState<string | null>(null);
+  const [jdVersionSource, setJdVersionSource] = useState<Resume | null>(null);
   const startTour = useTourStore((s) => s.startTour);
 
   // Auto-start dashboard tour for first-time users
@@ -89,11 +92,6 @@ export default function DashboardPage() {
     const timer = setTimeout(() => startTour('dashboard', DASHBOARD_TOUR_STEPS.length), 800);
     return () => clearTimeout(timer);
   }, [isLoading, fpLoading, startTour]);
-
-  // Hydrate view preference from localStorage on mount
-  useEffect(() => {
-    setViewMode(getInitialView());
-  }, []);
 
   // Persist view preference
   const handleViewChange = (mode: ViewMode) => {
@@ -117,7 +115,10 @@ export default function DashboardPage() {
     // Search filter
     if (searchQuery.trim()) {
       const query = searchQuery.trim().toLowerCase();
-      result = result.filter((r) => r.title.toLowerCase().includes(query));
+      result = result.filter((resume) => {
+        const targetLabel = getResumeTargetLabel(resume) ?? '';
+        return `${resume.title} ${targetLabel}`.toLowerCase().includes(query);
+      });
     }
 
     // Sort
@@ -128,6 +129,16 @@ export default function DashboardPage() {
 
   const hasResumes = resumes.length > 0;
   const hasResults = filteredResumes.length > 0;
+
+  const handleOpenJdVersionDialog = (resume: Resume) => {
+    setJdVersionSource(resume);
+    openModal('create-jd-version');
+  };
+
+  const handleCloseJdVersionDialog = () => {
+    closeModal();
+    setJdVersionSource(null);
+  };
 
   return (
     <div>
@@ -267,6 +278,7 @@ export default function DashboardPage() {
           resumes={filteredResumes}
           onDelete={deleteResume}
           onDuplicate={duplicateResume}
+          onCreateJdVersion={handleOpenJdVersionDialog}
           onRename={renameResume}
           onShare={(id) => setShareResumeId(id)}
         />
@@ -278,6 +290,7 @@ export default function DashboardPage() {
               resume={resume}
               onDelete={() => deleteResume(resume.id)}
               onDuplicate={() => duplicateResume(resume.id)}
+              onCreateJdVersion={() => handleOpenJdVersionDialog(resume)}
               onRename={(title) => renameResume(resume.id, title)}
             />
           ))}
@@ -288,6 +301,16 @@ export default function DashboardPage() {
         open={activeModal === 'create-resume'}
         onClose={closeModal}
         onCreate={createResume}
+      />
+      <CreateJdVersionDialog
+        open={activeModal === 'create-jd-version' && !!jdVersionSource}
+        onOpenChange={(nextOpen) => { if (!nextOpen) handleCloseJdVersionDialog(); }}
+        sourceResume={jdVersionSource}
+        onCreate={duplicateResume}
+        onCreated={(resume) => {
+          setJdVersionSource(null);
+          router.push(`/editor/${resume.id}`);
+        }}
       />
       <GenerateResumeDialog
         open={activeModal === 'generate-resume'}

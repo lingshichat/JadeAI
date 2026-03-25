@@ -2,8 +2,9 @@
 
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/routing';
-import { ArrowLeft, Undo2, Redo2, Download, Upload, Settings, Palette, Save, FileSearch, Languages, FileText, SpellCheck, Share2 } from 'lucide-react';
+import { ArrowLeft, Undo2, Redo2, Download, Upload, Settings, Palette, Save, FileSearch, Languages, FileText, SpellCheck, Share2, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ResumeTargetBadge } from '@/components/resume/resume-target-badge';
 import { Separator } from '@/components/ui/separator';
 import { useEditorStore } from '@/stores/editor-store';
 import { useResumeStore } from '@/stores/resume-store';
@@ -11,15 +12,11 @@ import { useUIStore } from '@/stores/ui-store';
 import { useSettingsStore } from '@/stores/settings-store';
 import { LocaleSwitcher } from '@/components/layout/locale-switcher';
 
-interface EditorToolbarProps {
-  resumeId: string;
-}
-
-export function EditorToolbar({ resumeId }: EditorToolbarProps) {
+export function EditorToolbar() {
   const t = useTranslations('editor.toolbar');
   const router = useRouter();
   const { toggleThemeEditor, showThemeEditor, undo, redo, undoStack, redoStack } = useEditorStore();
-  const { isSaving, isDirty, currentResume, sections, reorderSections, save } = useResumeStore();
+  const { isSaving, isDirty, currentResume, reorderSections, save } = useResumeStore();
   const { openModal } = useUIStore();
   const autoSave = useSettingsStore((s) => s.autoSave);
 
@@ -52,6 +49,11 @@ export function EditorToolbar({ resumeId }: EditorToolbarProps) {
         <span className="max-w-48 truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
           {currentResume?.title || ''}
         </span>
+        <ResumeTargetBadge
+          targetJobTitle={currentResume?.targetJobTitle}
+          targetCompany={currentResume?.targetCompany}
+          className="hidden max-w-56 md:inline-flex"
+        />
         <span className="text-xs text-zinc-400">
           {isSaving ? t('saving') : isDirty ? (autoSave ? '' : t('unsaved')) : t('autoSaved')}
         </span>
@@ -122,6 +124,16 @@ export function EditorToolbar({ resumeId }: EditorToolbarProps) {
           <span className="ml-1 text-xs hidden sm:inline">{t('share')}</span>
         </Button>
         <Separator orientation="vertical" className="h-6" />
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => openModal('create-jd-version')}
+          className="cursor-pointer"
+          title={t('createJdVersion')}
+        >
+          <Copy className="h-4 w-4" />
+          <span className="ml-1 text-xs hidden sm:inline">{t('createJdVersion')}</span>
+        </Button>
         <Button
           variant="ghost"
           size="sm"

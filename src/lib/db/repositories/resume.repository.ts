@@ -2,6 +2,21 @@ import { eq, desc, sql } from 'drizzle-orm';
 import { db } from '../index';
 import { resumes, resumeSections } from '../schema';
 
+function normalizeOptionalText(value: string | null | undefined) {
+  if (value == null) return null;
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
+type ResumeMutation = Partial<{
+  title: string;
+  template: string;
+  themeConfig: unknown;
+  language: string;
+  targetJobTitle: string | null;
+  targetCompany: string | null;
+}>;
+
 export const resumeRepository = {
   async findAllByUserId(userId: string) {
     return db.select().from(resumes).where(eq(resumes.userId, userId)).orderBy(desc(resumes.updatedAt));
@@ -14,20 +29,38 @@ export const resumeRepository = {
     return { ...resume[0], sections };
   },
 
-  async create(data: { userId: string; title?: string; template?: string; language?: string }) {
+  async create(data: {
+    userId: string;
+    title?: string;
+    template?: string;
+    themeConfig?: unknown;
+    language?: string;
+    targetJobTitle?: string | null;
+    targetCompany?: string | null;
+  }) {
     const id = crypto.randomUUID();
     await db.insert(resumes).values({
       id,
       userId: data.userId,
       title: data.title || '未命名简历',
       template: data.template || 'classic',
+      ...(data.themeConfig !== undefined ? { themeConfig: data.themeConfig } : {}),
       language: data.language || 'zh',
+      targetJobTitle: normalizeOptionalText(data.targetJobTitle),
+      targetCompany: normalizeOptionalText(data.targetCompany),
     });
     return this.findById(id);
   },
 
-  async update(id: string, data: Partial<{ title: string; template: string; themeConfig: unknown; language: string }>) {
-    await db.update(resumes).set({ ...data, updatedAt: new Date() } as any).where(eq(resumes.id, id));
+  async update(id: string, data: ResumeMutation) {
+    const payload = { ...data } as ResumeMutation;
+    if ('targetJobTitle' in data) {
+      payload.targetJobTitle = normalizeOptionalText(data.targetJobTitle);
+    }
+    if ('targetCompany' in data) {
+      payload.targetCompany = normalizeOptionalText(data.targetCompany);
+    }
+    await db.update(resumes).set({ ...payload, updatedAt: new Date() }).where(eq(resumes.id, id));
     return this.findById(id);
   },
 
@@ -35,18 +68,43 @@ export const resumeRepository = {
     await db.delete(resumes).where(eq(resumes.id, id));
   },
 
-  async duplicate(id: string, userId: string, titleOverride?: string) {
+  async duplicate(
+    id: string,
+    userId: string,
+    options?: {
+      title?: string;
+      targetJobTitle?: string | null;
+      targetCompany?: string | null;
+    }
+  ) {
     const original = await this.findById(id);
     if (!original) return null;
+
+    const titleOverride = options?.title?.trim();
+    const hasTargetJobTitle = options && 'targetJobTitle' in options;
+    const hasTargetCompany = options && 'targetCompany' in options;
+    const targetJobTitle = hasTargetJobTitle
+      ? normalizeOptionalText(options?.targetJobTitle)
+      : normalizeOptionalText(original.targetJobTitle);
+    const targetCompany = hasTargetCompany
+      ? normalizeOptionalText(options?.targetCompany)
+      : normalizeOptionalText(original.targetCompany);
+    const baseTitle = original.targetJobTitle && original.title.endsWith(` - ${original.targetJobTitle}`)
+      ? original.title.slice(0, -(` - ${original.targetJobTitle}`).length)
+      : original.title;
+    const derivedTitle = titleOverride
+      ?? (hasTargetJobTitle && targetJobTitle ? `${baseTitle} - ${targetJobTitle}` : `${original.title} (副本)`);
 
     const newId = crypto.randomUUID();
     await db.insert(resumes).values({
       id: newId,
       userId,
-      title: titleOverride ?? `${original.title} (副本)`,
+      title: derivedTitle,
       template: original.template,
       themeConfig: original.themeConfig,
       language: original.language,
+      targetJobTitle,
+      targetCompany,
     });
 
     for (const section of original.sections) {
@@ -73,11 +131,11 @@ export const resumeRepository = {
   },
 
   async incrementViewCount(id: string) {
-    await db.update(resumes).set({ viewCount: sql`${resumes.viewCount} + 1` } as any).where(eq(resumes.id, id));
+    await db.update(resumes).set({ viewCount: sql`${resumes.viewCount} + 1` }).where(eq(resumes.id, id));
   },
 
   async updateShareSettings(id: string, settings: { isPublic?: boolean; shareToken?: string | null; sharePassword?: string | null }) {
-    await db.update(resumes).set({ ...settings, updatedAt: new Date() } as any).where(eq(resumes.id, id));
+    await db.update(resumes).set({ ...settings, updatedAt: new Date() }).where(eq(resumes.id, id));
   },
 
   // Section operations
@@ -91,12 +149,13 @@ export const resumeRepository = {
       sortOrder: data.sortOrder,
       visible: data.visible ?? true,
       content: data.content || {},
-    } as any);
-    return db.select().from(resumeSections).where(eq(resumeSections.id, id)).limit(1).then((r: any[]) => r[0]);
+    });
+    const rows = await db.select().from(resumeSections).where(eq(resumeSections.id, id)).limit(1);
+    return rows[0];
   },
 
   async updateSection(id: string, data: Partial<{ title: string; sortOrder: number; visible: boolean; content: unknown }>) {
-    await db.update(resumeSections).set({ ...data, updatedAt: new Date() } as any).where(eq(resumeSections.id, id));
+    await db.update(resumeSections).set({ ...data, updatedAt: new Date() }).where(eq(resumeSections.id, id));
   },
 
   async deleteSection(id: string) {

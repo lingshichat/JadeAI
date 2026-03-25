@@ -4,6 +4,7 @@ import { use, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useEditor } from '@/hooks/use-editor';
 import { useFingerprint } from '@/hooks/use-fingerprint';
+import { useResume } from '@/hooks/use-resume';
 import { EditorToolbar } from '@/components/editor/editor-toolbar';
 import { EditorSidebar } from '@/components/editor/editor-sidebar';
 import { EditorCanvas } from '@/components/editor/editor-canvas';
@@ -19,11 +20,13 @@ import { ShareDialog } from '@/components/editor/share-dialog';
 import { CoverLetterDialog } from '@/components/editor/cover-letter-dialog';
 import { GrammarCheckDialog } from '@/components/editor/grammar-check-dialog';
 import { TourOverlay, type TourStepConfig } from '@/components/tour/tour-overlay';
+import { CreateJdVersionDialog } from '@/components/resume/create-jd-version-dialog';
 import { useEditorStore } from '@/stores/editor-store';
 import { useUIStore } from '@/stores/ui-store';
 import { useSettingsStore } from '@/stores/settings-store';
 import { useTourStore, hasCompletedTour } from '@/stores/tour-store';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useRouter } from '@/i18n/routing';
 
 const EDITOR_TOUR_STEPS: TourStepConfig[] = [
   { target: 'sidebar', placement: 'right', i18nKey: 'sidebar' },
@@ -35,7 +38,9 @@ const EDITOR_TOUR_STEPS: TourStepConfig[] = [
 
 export default function EditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const router = useRouter();
   const { isLoading: fpLoading } = useFingerprint();
+  const { duplicateResume } = useResume();
   const { resume, sections, updateSection, addSection, removeSection, reorderSections } = useEditor(id);
   const { showThemeEditor } = useEditorStore();
   const { activeModal, openModal, closeModal } = useUIStore();
@@ -86,7 +91,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
 
   return (
     <div className="flex h-screen flex-col">
-      <EditorToolbar resumeId={id} />
+      <EditorToolbar />
       <div className="flex flex-1 overflow-hidden">
         <EditorSidebar
           sections={sections}
@@ -104,6 +109,13 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
       </div>
       <AIChatBubble resumeId={id} />
       <SettingsDialog />
+      <CreateJdVersionDialog
+        open={activeModal === 'create-jd-version'}
+        onOpenChange={(open) => open ? openModal('create-jd-version') : closeModal()}
+        sourceResume={resume}
+        onCreate={duplicateResume}
+        onCreated={(nextResume) => router.push(`/editor/${nextResume.id}`)}
+      />
       <JdAnalysisDialog
         open={activeModal === 'jd-analysis'}
         onOpenChange={(open) => open ? openModal('jd-analysis') : closeModal()}

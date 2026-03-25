@@ -8,6 +8,8 @@ export const analysisRepository = {
   async createJdAnalysis(data: {
     resumeId: string;
     jobDescription: string;
+    targetJobTitle?: string | null;
+    targetCompany?: string | null;
     result: unknown;
     overallScore: number;
     atsScore: number;
@@ -17,10 +19,12 @@ export const analysisRepository = {
       id,
       resumeId: data.resumeId,
       jobDescription: data.jobDescription,
+      targetJobTitle: data.targetJobTitle ?? null,
+      targetCompany: data.targetCompany ?? null,
       result: data.result,
       overallScore: data.overallScore,
       atsScore: data.atsScore,
-    } as any);
+    });
     const rows = await db.select().from(jdAnalyses).where(eq(jdAnalyses.id, id)).limit(1);
     return rows[0];
   },
@@ -58,7 +62,7 @@ export const analysisRepository = {
       result: data.result,
       score: data.score,
       issueCount: data.issueCount,
-    } as any);
+    });
     const rows = await db.select().from(grammarChecks).where(eq(grammarChecks.id, id)).limit(1);
     return rows[0];
   },

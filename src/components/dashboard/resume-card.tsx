@@ -3,7 +3,7 @@
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/routing';
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Copy, Trash2, MoreVertical, Share2, Pencil } from 'lucide-react';
+import { BriefcaseBusiness, Copy, Trash2, MoreVertical, Share2, Pencil } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,17 +13,19 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { TemplateThumbnail } from './template-thumbnail';
 import { templateLabelsMap as templateLabelKeys } from '@/lib/template-labels';
+import { ResumeTargetBadge } from '@/components/resume/resume-target-badge';
 import type { Resume } from '@/types/resume';
 
 interface ResumeCardProps {
   resume: Resume;
   onDelete: () => void;
   onDuplicate: () => void;
+  onCreateJdVersion: () => void;
   onRename: (title: string) => void;
   onShare?: () => void;
 }
 
-export function ResumeCard({ resume, onDelete, onDuplicate, onRename, onShare }: ResumeCardProps) {
+export function ResumeCard({ resume, onDelete, onDuplicate, onCreateJdVersion, onRename, onShare }: ResumeCardProps) {
   const t = useTranslations();
   const router = useRouter();
   const [isRenaming, setIsRenaming] = useState(false);
@@ -120,10 +122,15 @@ export function ResumeCard({ resume, onDelete, onDuplicate, onRename, onShare }:
                 {resume.title}
               </h3>
             )}
-            <div className="mt-1.5 flex items-center gap-1.5">
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               <Badge variant="secondary" className="text-[11px] px-1.5 py-0">
                 {templateLabel}
               </Badge>
+              <ResumeTargetBadge
+                targetJobTitle={resume.targetJobTitle}
+                targetCompany={resume.targetCompany}
+                className="max-w-full text-[11px]"
+              />
               <span className="text-[11px] text-zinc-400 dark:text-zinc-500">
                 {resume.updatedAt
                   ? t('dashboard.lastEdited', {
@@ -160,6 +167,16 @@ export function ResumeCard({ resume, onDelete, onDuplicate, onRename, onShare }:
               >
                 <Copy className="mr-2 h-4 w-4" />
                 {t('common.duplicate')}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCreateJdVersion();
+                }}
+              >
+                <BriefcaseBusiness className="mr-2 h-4 w-4" />
+                {t('jdVersion.createAction')}
               </DropdownMenuItem>
               {onShare && (
                 <DropdownMenuItem
