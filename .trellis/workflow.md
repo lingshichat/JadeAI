@@ -217,12 +217,13 @@ python3 ./.trellis/scripts/task.py create "<title>" --slug <task-name>
    --> Run project's lint/test commands (see spec docs)
    --> Manual feature testing
 
-4. Commit code
-   --> By default, the human commits
-   --> AI may commit only after the user gives explicit authorization
+4. Commit / push code
+   --> By default, the human commits and pushes
+   --> AI may commit or push only after the user gives explicit authorization
    --> git add <files>
    --> git commit -m "type(scope): description"
        Format: feat/fix/docs/refactor/test/chore
+   --> git push <remote> <branch> (only when push is also explicitly authorized)
 
 5. Record session (one command)
    --> python3 ./.trellis/scripts/add_session.py --title "Title" --commit "hash"
@@ -358,8 +359,8 @@ python3 ./.trellis/scripts/task.py list-archive    # List archived tasks
 3. **After development complete**:
    - Use `/trellis:finish-work` for completion checklist
    - After fix bug, use `/trellis:break-loop` for deep analysis
-   - Human commits after testing passes by default
-   - AI may commit after testing passes only with explicit user authorization
+   - Human commits and pushes after testing passes by default
+   - AI may commit or push after testing passes only with explicit user authorization
    - Use `add_session.py` to record progress
 
 ### [X] DON'T - Should Not Do
@@ -369,7 +370,7 @@ python3 ./.trellis/scripts/task.py list-archive    # List archived tasks
 3. **Don't** develop multiple unrelated tasks simultaneously
 4. **Don't** commit code with lint/test errors
 5. **Don't** forget to update spec docs after learning something
-6. [!] **Don't** execute `git commit` without explicit user authorization
+6. [!] **Don't** execute `git commit` or `git push` without explicit user authorization
 
 ---
 
@@ -391,6 +392,8 @@ git commit -m "type(scope): description"
 
 **Type**: feat, fix, docs, refactor, test, chore
 **Scope**: Module name (e.g., auth, api, ui)
+
+`git push` is allowed only after the user explicitly authorizes the push target.
 
 ### Common Commands
 

@@ -19,8 +19,8 @@ Keep this managed block so 'trellis update' can refresh the instructions.
 
 ## Project Commit Policy
 
-- By default, AI should not run `git commit`.
+- By default, AI should not run `git commit` or `git push`.
 - After the user gives explicit authorization for the current changes, AI may
-  stage and commit on the user's behalf.
-- Before any AI-created commit, run the relevant finish/check flow and confirm
-  what will be included in the commit.
+  stage, commit, and push on the user's behalf.
+- Before any AI-created commit or push, run the relevant finish/check flow and
+  confirm what will be included plus the target branch/remote when pushing.

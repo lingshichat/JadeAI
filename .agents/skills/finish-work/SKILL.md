@@ -19,12 +19,14 @@ Before submitting or committing, use this checklist to ensure work completeness.
 # Must pass
 pnpm lint
 pnpm type-check
+
+# If the project defines a test script, it must pass too
 pnpm test
 ```
 
 - [ ] `pnpm lint` passes with 0 errors?
 - [ ] `pnpm type-check` passes with no type errors?
-- [ ] Tests pass?
+- [ ] If the project defines a test command, do tests pass?
 - [ ] No `console.log` statements (use logger)?
 - [ ] No non-null assertions (the `x!` operator)?
 - [ ] No `any` types?
@@ -99,6 +101,9 @@ If the change spans multiple layers:
 # 1. Code checks
 pnpm lint && pnpm type-check
 
+# 1.5 Optional: if package.json defines a test script
+pnpm test
+
 # 2. View changes
 git status
 git diff --name-only
@@ -136,7 +141,8 @@ Debug Flow:
 ```
 
 - `$finish-work` - Check work completeness (this skill)
-- `git commit` - Human commits by default; AI may commit with explicit user authorization
+- `git commit` / `git push` - Human executes by default; AI may do so only with
+  explicit user authorization
 - `$record-session` - Record session and commits
 - `$break-loop` - Deep analysis after debugging
 
