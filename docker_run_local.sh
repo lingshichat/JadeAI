@@ -9,13 +9,14 @@ usage() {
 Usage: ./docker_run_local.sh <command>
 
 Commands:
-  start    Start JadeAI in the background
+  start    Start RoleRover in the background
   stop     Stop the running container
   restart  Restart the running container
   down     Remove the container and network
   logs     Follow container logs
   status   Show container status
-  pull     Pull the latest image, then start
+  build    Rebuild the local image, then start
+  pull     Alias for build (kept for compatibility)
   help     Show this help
 
 Examples:
@@ -45,9 +46,9 @@ case "$command" in
   status)
     docker compose ps
     ;;
-  pull)
-    docker compose pull
-    docker compose up -d
+  build|pull)
+    docker compose build
+    docker compose up --build -d
     ;;
   help|-h|--help)
     usage

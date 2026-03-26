@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/sheet';
 
 const AUTH_ENABLED = process.env.NEXT_PUBLIC_AUTH_ENABLED === 'true';
-const GITHUB_REPO = 'twwch/JadeAI';
+const GITHUB_REPO = 'lingshichat/JadeAI';
 
 function useGitHubStars() {
   const [stars, setStars] = useState<number | null>(null);
@@ -62,7 +62,7 @@ export function LandingHeader() {
     >
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link href="/" className="flex items-center gap-2">
-          <Image src="/logo.svg" alt="JadeAI" width={120} height={36} priority />
+          <Image src="/logo.svg" alt="RoleRover" width={140} height={36} priority />
         </Link>
 
         <nav className="hidden items-center gap-8 md:flex">

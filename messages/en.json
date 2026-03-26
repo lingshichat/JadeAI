@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "JadeAI",
+    "appName": "RoleRover",
     "save": "Save",
     "cancel": "Cancel",
     "delete": "Delete",
@@ -504,7 +504,7 @@
     "description": "Import a previously exported JSON file to replace current content",
     "dashboardDescription": "Import a previously exported JSON file to create a new resume",
     "selectFile": "Click to select or drag a .json file here",
-    "dragHint": "Supports .json files exported from JadeAI",
+    "dragHint": "Supports .json files exported from RoleRover",
     "importing": "Importing...",
     "success": "Import successful!",
     "error": "Import failed. Please try again.",
@@ -696,7 +696,7 @@
     },
     "cta": {
       "title": "Ready to Build Your Best Resume?",
-      "subtitle": "Join thousands of job seekers who have landed interviews with JadeAI. No sign-up required.",
+      "subtitle": "Build, tailor, and export your resume in one workspace. No mandatory sign-up for fingerprint mode.",
       "button": "Create Your Resume Now"
     },
     "footer": {
@@ -720,7 +720,7 @@
         "terms": "Terms of Service",
         "cookies": "Cookie Policy"
       },
-      "copyright": "© {year} JadeAI. All rights reserved."
+      "copyright": "© {year} RoleRover. All rights reserved."
     }
   },
   "linkedinPhoto": {
@@ -777,6 +777,6 @@
     "submit": "View Resume",
     "invalidPassword": "Invalid password. Please try again.",
     "notFound": "This resume is not available or has been removed.",
-    "viewOnJadeAI": "View on JadeAI"
+    "openInApp": "Open in RoleRover"
   }
 }

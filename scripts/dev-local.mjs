@@ -12,7 +12,7 @@ const ENV_EXAMPLE = path.join(ROOT, '.env.example');
 const DATA_DIR = path.join(ROOT, 'data');
 
 function log(message) {
-  console.log(`[jadeai] ${message}`);
+  console.log(`[rolerover] ${message}`);
 }
 
 function ensureEnvFile() {
@@ -37,7 +37,7 @@ function startDevStack() {
   });
 
   child.on('error', (error) => {
-    console.error('[jadeai] Failed to start local dev stack:', error);
+    console.error('[rolerover] Failed to start local dev stack:', error);
     process.exit(1);
   });
 
@@ -58,8 +58,8 @@ function main() {
   log('Starting local dev stack on http://localhost:3000');
   log('Database migrations and demo data will be prepared automatically on first launch');
 
-  if (process.env.JADEAI_SKIP_START === '1') {
-    log('Bootstrap complete; skipped starting services because JADEAI_SKIP_START=1');
+  if (process.env.ROLEROVER_SKIP_START === '1' || process.env.JADEAI_SKIP_START === '1') {
+    log('Bootstrap complete; skipped starting services because ROLEROVER_SKIP_START=1');
     return;
   }
 

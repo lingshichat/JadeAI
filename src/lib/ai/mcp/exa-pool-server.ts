@@ -6,7 +6,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { z } from 'zod/v4';
 import { extractExaPoolHeaderConfig, fetchExaPoolWebPage, fetchWebPageInputSchema, fetchWebPageOutputSchema, getExaPoolConfig, getExaPoolMcpPort, searchExaPool, searchWebInputSchema, searchWebOutputSchema, type ExaPoolHeaderConfig } from '../exa-pool';
 
-const SERVER_NAME = 'jadeai-exa-pool-mcp';
+const SERVER_NAME = 'rolerover-exa-pool-mcp';
 const SERVER_VERSION = '0.1.0';
 
 function loadLocalEnvFiles() {

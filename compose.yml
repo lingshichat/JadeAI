@@ -1,9 +1,11 @@
-name: jadeai
+name: rolerover
 
 services:
   app:
-    container_name: jadeai
-    image: twwch/jadeai:latest
+    container_name: rolerover
+    build:
+      context: .
+    image: rolerover:latest
     env_file:
       - .env
     ports:

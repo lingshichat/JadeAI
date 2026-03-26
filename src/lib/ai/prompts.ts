@@ -15,7 +15,7 @@ export function getSystemPrompt(resumeContext: string, options?: { hasWebTools?:
     } catch { /* ignore parse errors */ }
   }
 
-  return `You are an expert resume optimization assistant for JadeAI.
+  return `You are an expert resume optimization assistant for RoleRover.
 Your goal is to help users improve their resumes to be more professional, impactful, and ATS-friendly.
 
 Guidelines:

@@ -162,7 +162,7 @@ async function exaPoolRequest(
     headers: {
       Authorization: `Bearer ${config.apiKey}`,
       'Content-Type': 'application/json',
-      'User-Agent': 'jadeai-exa-pool-mcp/1.0',
+      'User-Agent': 'rolerover-exa-pool-mcp/1.0',
     },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
