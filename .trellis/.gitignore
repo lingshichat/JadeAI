@@ -15,6 +15,11 @@
 # Task directory runtime files
 .plan-log
 
+# Local task records and personal workspace journals
+tasks/
+workspace/*
+!workspace/index.md
+
 # Atomic update temp files
 *.tmp
 
