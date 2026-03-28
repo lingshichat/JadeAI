@@ -7,11 +7,15 @@
     "dev": "node scripts/dev-local.mjs",
     "dev:stack": "concurrently -k --names app,mcp --prefix-colors blue,green \"npm run dev:web\" \"npm run dev:mcp\"",
     "dev:desktop": "concurrently -k --names desktop,mcp --prefix-colors cyan,green \"electron .\" \"npm run dev:mcp\"",
+    "dev:desktop-shell": "npm --prefix desktop run dev",
+    "dev:tauri": "npm --prefix desktop run tauri:dev",
     "dev:web": "next dev --turbopack",
     "dev:mcp": "node --import tsx src/lib/ai/mcp/exa-pool-server.ts",
     "build:export-css": "tsx scripts/build-export-css.ts",
     "prebuild": "tsx scripts/build-export-css.ts",
     "build": "next build",
+    "build:desktop-shell": "npm --prefix desktop run build",
+    "build:tauri": "npm --prefix desktop run tauri:build",
     "start:desktop": "electron .",
     "build:desktop": "npm run build && electron-builder --config electron-builder.yml",
     "start": "next start",
@@ -25,6 +29,7 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
+      "@tauri-apps/cli",
       "better-sqlite3",
       "@swc/core",
       "sharp",

@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "desktop-core"
+description = "Allows invoking the desktop bootstrap commands exposed by the application."
+commands.allow = ["get_bootstrap_context"]

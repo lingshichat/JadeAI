@@ -1,0 +1,22 @@
+[package]
+name = "rolerover-desktop"
+version = "0.1.0"
+description = "Tauri bootstrap shell for the RoleRover desktop rewrite"
+authors = ["RoleRover"]
+edition = "2021"
+rust-version = "1.77"
+
+[lib]
+name = "rolerover_desktop_lib"
+crate-type = ["cdylib", "rlib", "staticlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.0.0", features = [] }
+
+[dependencies]
+rusqlite = { version = "0.31.0", features = ["bundled"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+tauri = { version = "2.0.0", features = [] }
+uuid = { version = "1.18.1", features = ["v4"] }
