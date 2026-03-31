@@ -97,6 +97,26 @@ pub struct SecretVaultStatus {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SecretInventoryEntry {
+    pub key: String,
+    pub provider: Option<String>,
+    pub purpose: String,
+    pub updated_at_epoch_ms: u64,
+    pub is_configured: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SecretInventorySnapshot {
+    pub backend: SecretVaultBackend,
+    pub encrypted_at_rest: bool,
+    pub warnings: Vec<String>,
+    pub updated_at_epoch_ms: u64,
+    pub entries: Vec<SecretInventoryEntry>,
+}
+
+#[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SecretVaultReadiness {
     Ready,
@@ -144,6 +164,24 @@ pub struct SecureSettingsImportResult {
     pub imported_keys: Vec<String>,
     pub opaque_keys: Vec<String>,
     pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderConfigUpdateInput {
+    pub provider: String,
+    pub base_url: String,
+    pub model: String,
+    pub set_as_default: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SecretValueWriteInput {
+    pub key: String,
+    pub provider: Option<String>,
+    pub purpose: Option<String>,
+    pub value: String,
 }
 
 pub fn settings_file_path(workspace_root: &Path) -> PathBuf {
@@ -234,6 +272,173 @@ pub fn inspect_vault_status(workspace_root: &Path) -> Result<SecretVaultStatus, 
         fallback_path: path_to_string(&vault_fallback_path(workspace_root)),
         registered_secret_count: manifest.key_descriptors.len(),
     })
+}
+
+pub fn get_secret_inventory_snapshot(
+    workspace_root: &Path,
+) -> Result<SecretInventorySnapshot, String> {
+    let manifest = load_or_initialize_secrets_manifest(workspace_root)?;
+    let fallback = load_or_initialize_vault_fallback(workspace_root)?;
+    let mut entries = manifest
+        .key_descriptors
+        .iter()
+        .map(|descriptor| SecretInventoryEntry {
+            key: descriptor.key.clone(),
+            provider: descriptor.provider.clone(),
+            purpose: descriptor.purpose.clone(),
+            updated_at_epoch_ms: descriptor.updated_at_epoch_ms,
+            is_configured: fallback.entries.contains_key(&descriptor.key),
+        })
+        .collect::<Vec<_>>();
+
+    for (key, fallback_entry) in &fallback.entries {
+        if entries.iter().any(|entry| entry.key == *key) {
+            continue;
+        }
+
+        entries.push(SecretInventoryEntry {
+            key: key.clone(),
+            provider: infer_provider_from_secret_key(key),
+            purpose: "Secret value present in vault fallback without a manifest descriptor.".into(),
+            updated_at_epoch_ms: fallback_entry.imported_at_epoch_ms,
+            is_configured: true,
+        });
+    }
+
+    entries.sort_by(|left, right| left.key.cmp(&right.key));
+
+    Ok(SecretInventorySnapshot {
+        backend: manifest.vault_backend,
+        encrypted_at_rest: manifest.encrypted_at_rest,
+        warnings: manifest.warnings,
+        updated_at_epoch_ms: manifest
+            .updated_at_epoch_ms
+            .max(fallback.updated_at_epoch_ms),
+        entries,
+    })
+}
+
+pub fn update_ai_provider_settings(
+    workspace_root: &Path,
+    input: ProviderConfigUpdateInput,
+) -> Result<WorkspaceSettingsDocument, String> {
+    let normalized_provider = normalize_provider_key(&input.provider)
+        .ok_or_else(|| format!("unsupported provider '{}'", input.provider.trim()))?;
+    let base_url = input.base_url.trim();
+    if base_url.is_empty() {
+        return Err("provider baseUrl is required".into());
+    }
+
+    let model = input.model.trim();
+    if model.is_empty() {
+        return Err("provider model is required".into());
+    }
+
+    let mut document = load_or_initialize_settings(workspace_root)?;
+    document.ai.provider_configs.insert(
+        normalized_provider.into(),
+        ProviderRuntimeSettings {
+            base_url: base_url.into(),
+            model: model.into(),
+        },
+    );
+
+    if input.set_as_default {
+        document.ai.default_provider = normalized_provider.into();
+    }
+
+    persist_settings(workspace_root, document.clone())?;
+    load_or_initialize_settings(workspace_root)
+}
+
+pub fn write_secret_value(
+    workspace_root: &Path,
+    input: SecretValueWriteInput,
+) -> Result<SecretInventorySnapshot, String> {
+    let secret_key = input.key.trim();
+    if secret_key.is_empty() {
+        return Err("secret key is required".into());
+    }
+
+    let mut manifest = load_or_initialize_secrets_manifest(workspace_root)?;
+    let mut fallback = load_or_initialize_vault_fallback(workspace_root)?;
+    let timestamp = now_epoch_ms()?;
+    let trimmed_value = input.value.trim().to_string();
+    let provider = input
+        .provider
+        .as_deref()
+        .and_then(normalize_provider_key)
+        .map(ToString::to_string)
+        .or_else(|| infer_provider_from_secret_key(secret_key));
+    let purpose = input
+        .purpose
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("Desktop AI runtime credential.");
+
+    if trimmed_value.is_empty() {
+        fallback.entries.remove(secret_key);
+        manifest
+            .key_descriptors
+            .retain(|descriptor| descriptor.key != secret_key);
+    } else {
+        fallback.entries.insert(
+            secret_key.into(),
+            VaultFallbackEntry {
+                encoding: VaultFallbackEncoding::Utf8Plaintext,
+                encrypted: false,
+                value: trimmed_value,
+                imported_from: "desktop-runtime".into(),
+                imported_at_epoch_ms: timestamp,
+            },
+        );
+
+        manifest
+            .key_descriptors
+            .retain(|descriptor| descriptor.key != secret_key);
+        manifest.key_descriptors.push(SecretKeyDescriptor {
+            key: secret_key.into(),
+            provider,
+            purpose: purpose.into(),
+            updated_at_epoch_ms: timestamp,
+        });
+        manifest
+            .key_descriptors
+            .sort_by(|left, right| left.key.cmp(&right.key));
+    }
+
+    manifest.vault_backend = if fallback.entries.is_empty() {
+        SecretVaultBackend::Unconfigured
+    } else {
+        SecretVaultBackend::FileFallback
+    };
+    manifest.encrypted_at_rest = false;
+    manifest.warnings = build_runtime_manifest_warnings(!fallback.entries.is_empty());
+    persist_secrets_manifest(workspace_root, manifest)?;
+    if fallback.entries.is_empty() {
+        let path = vault_fallback_path(workspace_root);
+        if path.exists() {
+            fs::remove_file(&path)
+                .map_err(|error| format!("failed to remove {}: {error}", path.display()))?;
+        }
+    } else {
+        persist_vault_fallback(workspace_root, fallback)?;
+    }
+
+    get_secret_inventory_snapshot(workspace_root)
+}
+
+pub fn read_secret_value(workspace_root: &Path, key: &str) -> Result<Option<String>, String> {
+    let fallback = load_or_initialize_vault_fallback(workspace_root)?;
+    let Some(entry) = fallback.entries.get(key) else {
+        return Ok(None);
+    };
+
+    match entry.encoding {
+        VaultFallbackEncoding::Utf8Plaintext => Ok(Some(entry.value.clone())),
+        VaultFallbackEncoding::LegacySafeStorageBase64 => Ok(None),
+    }
 }
 
 pub fn import_legacy_secure_settings(
@@ -396,6 +601,27 @@ fn default_settings_document() -> Result<WorkspaceSettingsDocument, String> {
     })
 }
 
+fn load_or_initialize_vault_fallback(
+    workspace_root: &Path,
+) -> Result<VaultFallbackDocument, String> {
+    let path = vault_fallback_path(workspace_root);
+    if path.exists() {
+        return read_json_file::<VaultFallbackDocument>(&path);
+    }
+
+    default_vault_fallback_document()
+}
+
+fn persist_vault_fallback(
+    workspace_root: &Path,
+    mut document: VaultFallbackDocument,
+) -> Result<(), String> {
+    document.updated_at_epoch_ms = now_epoch_ms()?;
+    let path = vault_fallback_path(workspace_root);
+    ensure_parent(&path)?;
+    write_json_file(&path, &document)
+}
+
 fn default_secrets_manifest() -> Result<SecretsManifestDocument, String> {
     Ok(SecretsManifestDocument {
         schema_version: 1,
@@ -409,6 +635,31 @@ fn default_secrets_manifest() -> Result<SecretsManifestDocument, String> {
         ],
         updated_at_epoch_ms: now_epoch_ms()?,
     })
+}
+
+fn default_vault_fallback_document() -> Result<VaultFallbackDocument, String> {
+    Ok(VaultFallbackDocument {
+        schema_version: 1,
+        entries: BTreeMap::new(),
+        updated_at_epoch_ms: now_epoch_ms()?,
+    })
+}
+
+fn build_runtime_manifest_warnings(has_values: bool) -> Vec<String> {
+    if !has_values {
+        return vec![
+            "Vault backend is not configured yet; secret persistence must be wired before production use."
+                .into(),
+            "No plaintext secret values are stored in this manifest.".into(),
+        ];
+    }
+
+    vec![
+        "Secrets are currently stored in vault-fallback.json until an encrypted desktop vault backend is wired."
+            .into(),
+        "Desktop AI smoke tests should be validated in the native shell; browser fallback cannot persist or stream secrets honestly."
+            .into(),
+    ]
 }
 
 fn import_provider_map_entry(
@@ -654,6 +905,12 @@ fn normalize_provider_key(provider: &str) -> Option<&'static str> {
         "gemini" => Some("gemini"),
         _ => None,
     }
+}
+
+fn infer_provider_from_secret_key(key: &str) -> Option<String> {
+    key.strip_prefix("provider.")
+        .and_then(|value| value.strip_suffix(".api_key"))
+        .map(|value| value.to_string())
 }
 
 fn decode_base64(input: &str) -> Result<Vec<u8>, String> {

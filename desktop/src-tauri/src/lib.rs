@@ -1,3 +1,4 @@
+mod ai;
 mod domain;
 mod importer;
 mod legacy_import_contract;
@@ -12,7 +13,10 @@ use importer::{
 };
 use legacy_import_contract::LegacyImportContract;
 use serde::Serialize;
-use settings::{SecretVaultStatus, WorkspaceSettingsDocument};
+use settings::{
+    ProviderConfigUpdateInput, SecretInventorySnapshot, SecretValueWriteInput, SecretVaultStatus,
+    WorkspaceSettingsDocument,
+};
 use storage::{StorageSnapshot, TemplateValidationExportWriteResult, TemplateValidationSnapshot};
 use tauri::Manager;
 use workspace::WorkspaceSnapshot;
@@ -118,6 +122,39 @@ fn get_secret_vault_status(app: tauri::AppHandle) -> Result<SecretVaultStatus, S
 }
 
 #[tauri::command]
+fn get_secret_inventory_snapshot(app: tauri::AppHandle) -> Result<SecretInventorySnapshot, String> {
+    let workspace_root = resolve_workspace_root(&app)?;
+    settings::get_secret_inventory_snapshot(&workspace_root)
+}
+
+#[tauri::command]
+fn update_ai_provider_settings(
+    app: tauri::AppHandle,
+    input: ProviderConfigUpdateInput,
+) -> Result<WorkspaceSettingsDocument, String> {
+    let workspace_root = resolve_workspace_root(&app)?;
+    settings::update_ai_provider_settings(&workspace_root, input)
+}
+
+#[tauri::command]
+fn write_secret_value(
+    app: tauri::AppHandle,
+    input: SecretValueWriteInput,
+) -> Result<SecretInventorySnapshot, String> {
+    let workspace_root = resolve_workspace_root(&app)?;
+    settings::write_secret_value(&workspace_root, input)
+}
+
+#[tauri::command]
+fn start_ai_prompt_stream(
+    app: tauri::AppHandle,
+    input: ai::StartAiPromptStreamInput,
+) -> Result<ai::AiStreamStartReceipt, String> {
+    let workspace_root = resolve_workspace_root(&app)?;
+    ai::start_ai_prompt_stream(&app, &workspace_root, input)
+}
+
+#[tauri::command]
 fn get_importer_dry_run(app: tauri::AppHandle) -> Result<ImporterDryRunSnapshot, String> {
     build_importer_snapshot(&app, ImporterExecutionMode::DryRun)
 }
@@ -204,6 +241,10 @@ pub fn run() {
             write_template_validation_export,
             get_workspace_settings_snapshot,
             get_secret_vault_status,
+            get_secret_inventory_snapshot,
+            update_ai_provider_settings,
+            write_secret_value,
+            start_ai_prompt_stream,
             get_importer_dry_run,
             execute_importer_staging,
             execute_importer_migration

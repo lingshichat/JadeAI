@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 export type DesktopRuntimeMode = "tauri" | "browser_fallback";
 
@@ -227,6 +228,73 @@ export interface SecretVaultStatus {
   manifestPath: string;
   fallbackPath: string;
   registeredSecretCount: number;
+}
+
+export interface SecretInventoryEntry {
+  key: string;
+  provider: string | null;
+  purpose: string;
+  updatedAtEpochMs: number;
+  isConfigured: boolean;
+}
+
+export interface SecretInventorySnapshot {
+  backend: SecretVaultBackend;
+  encryptedAtRest: boolean;
+  warnings: string[];
+  updatedAtEpochMs: number;
+  entries: SecretInventoryEntry[];
+}
+
+export interface ProviderConfigUpdateInput {
+  provider: string;
+  baseUrl: string;
+  model: string;
+  setAsDefault: boolean;
+}
+
+export interface SecretValueWriteInput {
+  key: string;
+  provider?: string | null;
+  purpose?: string | null;
+  value: string;
+}
+
+export interface StartAiPromptStreamInput {
+  provider: string;
+  prompt: string;
+  model?: string;
+  baseUrl?: string;
+  requestId?: string;
+  systemPrompt?: string;
+}
+
+export interface AiStreamStartReceipt {
+  requestId: string;
+  provider: string;
+  model: string;
+  eventName: string;
+  startedAtEpochMs: number;
+}
+
+export type DesktopAiStreamEventKind =
+  | "started"
+  | "delta"
+  | "completed"
+  | "error";
+
+export interface DesktopAiStreamEvent {
+  requestId: string;
+  provider: string;
+  model: string;
+  kind: DesktopAiStreamEventKind;
+  startedAtEpochMs: number;
+  emittedAtEpochMs: number;
+  finishedAtEpochMs?: number | null;
+  chunkIndex?: number | null;
+  deltaText?: string | null;
+  accumulatedText?: string | null;
+  errorMessage?: string | null;
 }
 
 export type ImporterSourceKind =
@@ -704,6 +772,38 @@ const FALLBACK_VAULT_STATUS: SecretVaultStatus = {
   registeredSecretCount: 0,
 };
 
+const FALLBACK_SECRET_INVENTORY: SecretInventorySnapshot = {
+  backend: "unconfigured",
+  encryptedAtRest: false,
+  warnings: [
+    "Secret inventory is unavailable in browser fallback mode.",
+  ],
+  updatedAtEpochMs: 0,
+  entries: [
+    {
+      key: "provider.openai.api_key",
+      provider: "openai",
+      purpose: "Desktop AI runtime credential.",
+      updatedAtEpochMs: 0,
+      isConfigured: false,
+    },
+    {
+      key: "provider.anthropic.api_key",
+      provider: "anthropic",
+      purpose: "Desktop AI runtime credential.",
+      updatedAtEpochMs: 0,
+      isConfigured: false,
+    },
+    {
+      key: "provider.gemini.api_key",
+      provider: "gemini",
+      purpose: "Desktop AI runtime credential.",
+      updatedAtEpochMs: 0,
+      isConfigured: false,
+    },
+  ],
+};
+
 const FALLBACK_IMPORTER_DRY_RUN: ImporterDryRunSnapshot = {
   plan: {
     version: 1,
@@ -991,6 +1091,8 @@ function reportDesktopFallback(command: string, error: unknown): void {
   console.warn(`[desktop-api] Falling back for ${command}.`, error);
 }
 
+export const DESKTOP_AI_STREAM_EVENT = "desktop://ai-stream";
+
 async function invokeWithFallback<T>(command: string, fallback: T): Promise<T> {
   try {
     return await invoke<T>(command);
@@ -1038,6 +1140,13 @@ export async function getSecretVaultStatus(): Promise<SecretVaultStatus> {
   return invokeWithFallback("get_secret_vault_status", FALLBACK_VAULT_STATUS);
 }
 
+export async function getSecretInventorySnapshot(): Promise<SecretInventorySnapshot> {
+  return invokeWithFallback(
+    "get_secret_inventory_snapshot",
+    FALLBACK_SECRET_INVENTORY,
+  );
+}
+
 export async function getImporterDryRun(): Promise<ImporterDryRunSnapshot> {
   return invokeWithFallback("get_importer_dry_run", FALLBACK_IMPORTER_DRY_RUN);
 }
@@ -1065,4 +1174,37 @@ export async function writeTemplateValidationExport(input: {
     "write_template_validation_export",
     input,
   );
+}
+
+export async function updateAiProviderSettings(
+  input: ProviderConfigUpdateInput,
+): Promise<WorkspaceSettingsDocument> {
+  return invoke<WorkspaceSettingsDocument>("update_ai_provider_settings", {
+    input,
+  });
+}
+
+export async function writeSecretValue(
+  input: SecretValueWriteInput,
+): Promise<SecretInventorySnapshot> {
+  return invoke<SecretInventorySnapshot>("write_secret_value", { input });
+}
+
+export async function startAiPromptStream(
+  input: StartAiPromptStreamInput,
+): Promise<AiStreamStartReceipt> {
+  return invoke<AiStreamStartReceipt>("start_ai_prompt_stream", { input });
+}
+
+export async function listenToAiStreamEvents(
+  handler: (event: DesktopAiStreamEvent) => void,
+): Promise<UnlistenFn> {
+  try {
+    return await listen<DesktopAiStreamEvent>(DESKTOP_AI_STREAM_EVENT, (event) => {
+      handler(event.payload);
+    });
+  } catch (error) {
+    reportDesktopFallback(DESKTOP_AI_STREAM_EVENT, error);
+    return () => undefined;
+  }
 }

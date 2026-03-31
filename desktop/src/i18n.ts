@@ -40,6 +40,7 @@ const resources = {
       shellNavigationLabel: "Desktop sections",
       navOverview: "Overview",
       navLibrary: "Library",
+      navAiRuntime: "AI Runtime",
       navImports: "Imports",
       navSettings: "Settings",
       shellHeaderSubtitle: "Desktop workspace",
@@ -225,7 +226,7 @@ const resources = {
       settingsLabel: "Desktop settings",
       settingsTitle: "Runtime and provider controls",
       settingsBody:
-        "This stub centralizes provider credentials, storage location, language, and desktop behavior controls.",
+        "This surface now drives provider config, fallback secret storage, and native streaming validation from the desktop runtime boundary.",
       settingsBodyFallback:
         "This settings surface is still running as a browser shell. It can preview the contract, but desktop-native secrets and filesystem behavior are not active here.",
       settingsRuntimeNativeTitle: "Settings are reading desktop runtime state",
@@ -237,7 +238,7 @@ const resources = {
       settingsProvidersTitle: "AI providers",
       settingsProvidersHeader: "Provider credentials",
       settingsProvidersBody:
-        "Secure settings continue to live behind desktop-native encryption and Rust ownership.",
+        "Provider config now persists through Rust-owned workspace settings, while secrets stay in the fallback vault until an encrypted backend lands.",
       settingsStorageTitle: "Workspace storage",
       settingsStorageHeader: "Data location",
       settingsStorageBody:
@@ -250,12 +251,63 @@ const resources = {
       settingsTabExperience: "Appearance",
       settingsTabWorkspace: "Workspace",
       settingsReadOnlyHint:
-        "This dialog mirrors the web settings structure while desktop settings stay read-only runtime snapshots in this migration phase.",
+        "This surface now writes provider config and smoke-test secrets into the desktop workspace contract; browser fallback remains read-only and non-authoritative.",
       settingsClose: "Close settings",
+      aiRuntimeTitle: "AI runtime",
+      aiRuntimeHeader: "Native provider smoke test",
+      aiRuntimeBody:
+        "PR5 validates one honest vertical slice: provider config, secret storage, Rust-side streaming, and renderer-side incremental consumption inside the Tauri shell.",
+      aiRuntimeIdle: "Idle",
+      aiRuntimeStreaming: "Streaming",
+      aiRuntimeNeedsDesktopTitle: "Run this in the desktop shell",
+      aiRuntimeNeedsDesktopBody:
+        "Browser fallback can preview the contract, but it cannot prove native secret persistence or the Rust event bridge.",
+      aiRuntimeProviderLabel: "Provider",
+      aiRuntimeApiKeyLabel: "API key",
+      aiRuntimeApiKeyPlaceholder: "Paste a desktop test key",
+      aiRuntimeSetAsDefault: "Use this provider as the desktop default",
+      aiRuntimeSaveConfig: "Save provider config",
+      aiRuntimeSavingConfig: "Saving config...",
+      aiRuntimeSaveSecret: "Save API key",
+      aiRuntimeSavingSecret: "Saving key...",
+      aiRuntimeSecretConfigured: "Secret configured",
+      aiRuntimeSecretMissing: "Secret missing",
+      aiRuntimePromptLabel: "Prompt",
+      aiRuntimePromptPlaceholder:
+        "Ask the native runtime to summarize how the new desktop architecture differs from the legacy web path.",
+      aiRuntimeRunPrompt: "Run native stream",
+      aiRuntimeClear: "Clear output",
+      aiRuntimeOpenAiFirst: "PR5 streams the OpenAI-compatible path first",
+      aiRuntimeEventsTitle: "Event bridge",
+      aiRuntimeEventsHeader: "Incremental event log",
+      aiRuntimeEventsEmptyTitle: "No events yet",
+      aiRuntimeEventsEmptyBody:
+        "Start a native prompt to watch Tauri stream events land here.",
+      aiRuntimeOutputTitle: "Response",
+      aiRuntimeOutputHeader: "Accumulated assistant text",
+      aiRuntimeOutputEmptyTitle: "No output yet",
+      aiRuntimeOutputEmptyBody:
+        "The Rust bridge will append tokens here as provider deltas arrive.",
+      aiRuntimeConfigSaved: "Provider config saved to the desktop workspace.",
+      aiRuntimeConfigSaveFailed: "Failed to save provider config.",
+      aiRuntimeSecretSaved: "API key saved into the desktop fallback vault.",
+      aiRuntimeSecretSaveFailed: "Failed to save API key.",
+      aiRuntimeStreamStartedNotice:
+        "Native streaming started for {{provider}}.",
+      aiRuntimeStreamCompletedNotice:
+        "Native streaming completed and the renderer consumed the full response.",
+      aiRuntimeStreamFailedNotice: "Native streaming failed.",
+      aiRuntimeEventStarted:
+        "Started {{provider}} stream with model {{model}}.",
+      aiRuntimeEventDelta:
+        "Received chunk {{chunk}} ({{size}} chars).",
+      aiRuntimeEventCompleted:
+        "Stream completed after {{chunks}} chunk(s).",
+      aiRuntimeEventError: "The native stream reported an error.",
       vaultLabel: "Vault",
       vaultTitle: "Secrets readiness",
       vaultBody:
-        "Secrets remain explicitly unconfigured until a real encrypted backend is wired. The shell reports that state directly.",
+        "The shell reports whether secrets are still unconfigured, stored in the degraded fallback vault, or backed by a future encrypted desktop backend.",
       vaultStatusReady: "Vault ready",
       vaultStatusNeedsConfiguration: "Needs configuration",
       vaultStatusDegraded: "Vault degraded",
@@ -410,6 +462,7 @@ const resources = {
       shellNavigationLabel: "桌面分区导航",
       navOverview: "总览",
       navLibrary: "资料库",
+      navAiRuntime: "AI 运行时",
       navImports: "导入",
       navSettings: "设置",
       shellHeaderSubtitle: "桌面工作区",
@@ -590,7 +643,7 @@ const resources = {
       settingsLabel: "桌面设置",
       settingsTitle: "运行时与 Provider 控制",
       settingsBody:
-        "这个页面骨架会统一承载 Provider 凭据、存储位置、语言和桌面行为设置。",
+        "这个界面现在直接驱动桌面运行时里的 Provider 配置、fallback 密钥存储和原生流式验证。",
       settingsBodyFallback:
         "这个设置页当前仍运行在浏览器壳里，只能预览契约，桌面端 secrets 和文件系统行为还没有真正生效。",
       settingsRuntimeNativeTitle: "设置页已读取桌面运行时状态",
@@ -602,7 +655,7 @@ const resources = {
       settingsProvidersTitle: "AI Provider",
       settingsProvidersHeader: "Provider 凭据",
       settingsProvidersBody:
-        "敏感设置继续走桌面端加密与 Rust 侧 ownership，不落普通存储。",
+        "Provider 配置现在通过 Rust 持有的工作区设置落盘，密钥则暂时保存在 fallback vault，直到真正的加密后端接入。",
       settingsStorageTitle: "工作区存储",
       settingsStorageHeader: "数据位置",
       settingsStorageBody:
@@ -615,12 +668,62 @@ const resources = {
       settingsTabExperience: "外观",
       settingsTabWorkspace: "工作区",
       settingsReadOnlyHint:
-        "这个弹层先对齐 web 设置结构；当前阶段桌面设置仍然以运行时快照只读展示为主。",
+        "这个界面现在会把 Provider 配置和 smoke test 用的 secrets 写入桌面工作区契约；浏览器 fallback 仍然只是只读预览，不能当真。",
       settingsClose: "关闭设置",
+      aiRuntimeTitle: "AI 运行时",
+      aiRuntimeHeader: "原生 Provider 冒烟验证",
+      aiRuntimeBody:
+        "PR5 先打通一条诚实的竖切：Provider 配置、Secret 承载、Rust 侧流式桥接，以及渲染层的增量消费都在 Tauri 壳里闭环。",
+      aiRuntimeIdle: "空闲",
+      aiRuntimeStreaming: "流式处理中",
+      aiRuntimeNeedsDesktopTitle: "请在桌面壳里验证",
+      aiRuntimeNeedsDesktopBody:
+        "浏览器 fallback 只能预览契约，不能证明原生 secret 持久化和 Rust 事件桥已经真实生效。",
+      aiRuntimeProviderLabel: "Provider",
+      aiRuntimeApiKeyLabel: "API Key",
+      aiRuntimeApiKeyPlaceholder: "粘贴桌面测试用密钥",
+      aiRuntimeSetAsDefault: "把当前 Provider 设为桌面默认值",
+      aiRuntimeSaveConfig: "保存 Provider 配置",
+      aiRuntimeSavingConfig: "正在保存配置...",
+      aiRuntimeSaveSecret: "保存 API Key",
+      aiRuntimeSavingSecret: "正在保存密钥...",
+      aiRuntimeSecretConfigured: "密钥已配置",
+      aiRuntimeSecretMissing: "缺少密钥",
+      aiRuntimePromptLabel: "提示词",
+      aiRuntimePromptPlaceholder:
+        "让原生运行时总结一下新桌面架构和旧 web 路径的差异。",
+      aiRuntimeRunPrompt: "运行原生流式请求",
+      aiRuntimeClear: "清空输出",
+      aiRuntimeOpenAiFirst: "PR5 先验证 OpenAI-compatible 流式链路",
+      aiRuntimeEventsTitle: "事件桥",
+      aiRuntimeEventsHeader: "增量事件日志",
+      aiRuntimeEventsEmptyTitle: "还没有事件",
+      aiRuntimeEventsEmptyBody:
+        "启动一次原生 prompt 后，这里会看到 Tauri 事件流逐步落下来。",
+      aiRuntimeOutputTitle: "响应输出",
+      aiRuntimeOutputHeader: "累计助手文本",
+      aiRuntimeOutputEmptyTitle: "还没有输出",
+      aiRuntimeOutputEmptyBody:
+        "当 Provider 增量返回 token 时，Rust 桥会把累计文本持续写到这里。",
+      aiRuntimeConfigSaved: "Provider 配置已保存到桌面工作区。",
+      aiRuntimeConfigSaveFailed: "保存 Provider 配置失败。",
+      aiRuntimeSecretSaved: "API Key 已保存到桌面 fallback vault。",
+      aiRuntimeSecretSaveFailed: "保存 API Key 失败。",
+      aiRuntimeStreamStartedNotice: "{{provider}} 的原生流式请求已启动。",
+      aiRuntimeStreamCompletedNotice:
+        "原生流式请求已完成，渲染层已消费完整响应。",
+      aiRuntimeStreamFailedNotice: "原生流式请求失败。",
+      aiRuntimeEventStarted:
+        "已启动 {{provider}} 流，请求模型 {{model}}。",
+      aiRuntimeEventDelta:
+        "收到第 {{chunk}} 个分片（{{size}} 个字符）。",
+      aiRuntimeEventCompleted:
+        "流式完成，共收到 {{chunks}} 个分片。",
+      aiRuntimeEventError: "原生流式桥返回了错误。",
       vaultLabel: "Vault",
       vaultTitle: "Secrets 就绪状态",
       vaultBody:
-        "在真正接入加密后端之前，secrets 会明确显示为“未配置”，不会伪装成已经安全。",
+        "这个壳层会直接告诉你密钥目前是未配置、落在降级的 fallback vault，还是已经切到未来的加密桌面后端。",
       vaultStatusReady: "Vault 已就绪",
       vaultStatusNeedsConfiguration: "需要配置",
       vaultStatusDegraded: "Vault 已降级",
