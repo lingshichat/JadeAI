@@ -2,6 +2,12 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* Ensure Tailwind scans shared component/lib files for utility classes.
+   Paths are relative to this file (src/app/globals.css).
+   Redundant for Next.js (auto-detects), but required for Desktop Vite build. */
+@source "../components/";
+@source "../lib/";
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
