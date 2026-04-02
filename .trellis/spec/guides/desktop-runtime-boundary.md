@@ -30,7 +30,8 @@ This contract covers the bootstrap-stage desktop shell in `desktop/`:
 - `desktop/src/lib/template-validation.ts`
 - `desktop/src/routes/root.tsx`
 - `desktop/src/routes/home.tsx`
-- `desktop/src/routes/library.tsx`
+- `desktop/src/routes/dashboard.tsx`
+- `desktop/src/routes/templates.tsx`
 - `desktop/src/routes/settings.tsx`
 - `desktop/src/i18n.ts`
 - `src/lib/constants.ts`
@@ -76,7 +77,8 @@ Desktop active surface enforced by `lint:desktop:active`:
 - `desktop/src/i18n.ts`
 - `desktop/src/routes/root.tsx`
 - `desktop/src/routes/home.tsx`
-- `desktop/src/routes/library.tsx`
+- `desktop/src/routes/dashboard.tsx`
+- `desktop/src/routes/templates.tsx`
 - `desktop/src/routes/settings.tsx`
 
 Shared active surface v1 enforced by `lint:desktop:shared`:
@@ -465,7 +467,8 @@ Pages:
 
 - `desktop/src/routes/root.tsx`
 - `desktop/src/routes/home.tsx`
-- `desktop/src/routes/library.tsx`
+- `desktop/src/routes/dashboard.tsx`
+- `desktop/src/routes/templates.tsx`
 - `desktop/src/routes/settings.tsx`
 
 Rules:
