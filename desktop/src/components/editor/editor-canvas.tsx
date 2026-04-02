@@ -1,0 +1,119 @@
+import { useState, useCallback } from "react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  DragOverlay,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useEditorStore } from "../../stores/editor-store";
+import { SectionWrapper } from "./section-wrapper";
+import type { ResumeSectionWithContent } from "../../stores/resume-store";
+
+export interface EditorCanvasProps {
+  sections: ResumeSectionWithContent[];
+  onUpdateSection: (sectionId: string, content: Partial<Record<string, unknown>>) => void;
+  onRemoveSection: (sectionId: string) => void;
+  onReorderSections: (sections: ResumeSectionWithContent[]) => void;
+}
+
+export function EditorCanvas({
+  sections,
+  onUpdateSection,
+  onRemoveSection,
+  onReorderSections,
+}: EditorCanvasProps) {
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const { setDragging } = useEditorStore();
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragStart = useCallback(
+    (event: DragStartEvent) => {
+      setActiveId(event.active.id as string);
+      setDragging(true);
+    },
+    [setDragging]
+  );
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      setActiveId(null);
+      setDragging(false);
+
+      if (over && active.id !== over.id) {
+        const oldIndex = sections.findIndex((s) => s.id === active.id);
+        const newIndex = sections.findIndex((s) => s.id === over.id);
+
+        if (oldIndex !== -1 && newIndex !== -1) {
+          const newSections = [...sections];
+          const [removed] = newSections.splice(oldIndex, 1);
+          newSections.splice(newIndex, 0, removed);
+          const reordered = newSections.map((s, i) => ({ ...s, sortOrder: i }));
+          onReorderSections(reordered as ResumeSectionWithContent[]);
+        }
+      }
+    },
+    [sections, onReorderSections, setDragging]
+  );
+
+  const activeSection = activeId
+    ? sections.find((s) => s.id === activeId)
+    : null;
+
+  return (
+    <div className="min-w-0 flex-[4] overflow-hidden bg-zinc-50 dark:bg-zinc-950">
+      <ScrollArea className="h-full">
+        <div className="mx-auto max-w-3xl px-6 py-8">
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={sections.map((s) => s.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="space-y-4">
+                {sections.map((section) => (
+                  <div key={section.id} data-section-id={section.id}>
+                    <SectionWrapper
+                      section={section}
+                      onUpdate={(content) => onUpdateSection(section.id, content)}
+                      onRemove={() => onRemoveSection(section.id)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </SortableContext>
+
+            <DragOverlay>
+              {activeSection && (
+                <div className="rounded-lg border-2 border-pink-300 bg-white dark:bg-zinc-800 p-4 opacity-80 shadow-xl">
+                  <p className="font-medium text-zinc-700 dark:text-zinc-200">
+                    {activeSection.title}
+                  </p>
+                </div>
+              )}
+            </DragOverlay>
+          </DndContext>
+        </div>
+      </ScrollArea>
+    </div>
+  );
+}

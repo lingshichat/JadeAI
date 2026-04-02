@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fs,
     path::{Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
@@ -177,6 +177,15 @@ pub struct ProviderConfigUpdateInput {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct WorkspaceAppearanceSettingsUpdateInput {
+    pub locale: String,
+    pub theme: String,
+    pub auto_save: bool,
+    pub remember_window_state: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SecretValueWriteInput {
     pub key: String,
     pub provider: Option<String>,
@@ -244,29 +253,19 @@ pub fn persist_secrets_manifest(
 
 pub fn inspect_vault_status(workspace_root: &Path) -> Result<SecretVaultStatus, String> {
     let manifest = load_or_initialize_secrets_manifest(workspace_root)?;
+    let fallback = load_or_initialize_vault_fallback(workspace_root)?;
     let has_fallback_file = vault_fallback_path(workspace_root).exists();
+    let runtime = evaluate_runtime_vault_state(&manifest, &fallback)?;
 
-    let mut warnings = manifest.warnings.clone();
+    let mut warnings = runtime.warnings;
     if has_fallback_file {
         warnings.push("vault-fallback.json detected; plaintext fallback path exists".into());
     }
 
-    let status = match manifest.vault_backend {
-        SecretVaultBackend::Unconfigured => SecretVaultReadiness::NeedsConfiguration,
-        SecretVaultBackend::OsKeyring | SecretVaultBackend::Stronghold => {
-            if manifest.encrypted_at_rest {
-                SecretVaultReadiness::Ready
-            } else {
-                SecretVaultReadiness::Degraded
-            }
-        }
-        SecretVaultBackend::FileFallback => SecretVaultReadiness::Degraded,
-    };
-
     Ok(SecretVaultStatus {
-        backend: manifest.vault_backend,
-        encrypted_at_rest: manifest.encrypted_at_rest,
-        status,
+        backend: runtime.backend,
+        encrypted_at_rest: runtime.encrypted_at_rest,
+        status: runtime.readiness,
         warnings,
         manifest_path: path_to_string(&secrets_manifest_path(workspace_root)),
         fallback_path: path_to_string(&vault_fallback_path(workspace_root)),
@@ -279,20 +278,33 @@ pub fn get_secret_inventory_snapshot(
 ) -> Result<SecretInventorySnapshot, String> {
     let manifest = load_or_initialize_secrets_manifest(workspace_root)?;
     let fallback = load_or_initialize_vault_fallback(workspace_root)?;
+    let runtime = evaluate_runtime_vault_state(&manifest, &fallback)?;
     let mut entries = manifest
         .key_descriptors
         .iter()
-        .map(|descriptor| SecretInventoryEntry {
-            key: descriptor.key.clone(),
-            provider: descriptor.provider.clone(),
-            purpose: descriptor.purpose.clone(),
-            updated_at_epoch_ms: descriptor.updated_at_epoch_ms,
-            is_configured: fallback.entries.contains_key(&descriptor.key),
+        .map(|descriptor| {
+            let storage_state = resolve_secret_storage_state(&descriptor.key, &fallback)?;
+            Ok(SecretInventoryEntry {
+                key: descriptor.key.clone(),
+                provider: descriptor.provider.clone(),
+                purpose: descriptor.purpose.clone(),
+                updated_at_epoch_ms: descriptor.updated_at_epoch_ms,
+                is_configured: !matches!(storage_state, SecretStorageState::Missing),
+            })
         })
+        .collect::<Result<Vec<_>, String>>()?;
+
+    let descriptor_keys = manifest
+        .key_descriptors
+        .iter()
+        .map(|descriptor| descriptor.key.as_str())
         .collect::<Vec<_>>();
 
     for (key, fallback_entry) in &fallback.entries {
-        if entries.iter().any(|entry| entry.key == *key) {
+        if descriptor_keys
+            .iter()
+            .any(|descriptor_key| *descriptor_key == key)
+        {
             continue;
         }
 
@@ -308,9 +320,9 @@ pub fn get_secret_inventory_snapshot(
     entries.sort_by(|left, right| left.key.cmp(&right.key));
 
     Ok(SecretInventorySnapshot {
-        backend: manifest.vault_backend,
-        encrypted_at_rest: manifest.encrypted_at_rest,
-        warnings: manifest.warnings,
+        backend: runtime.backend,
+        encrypted_at_rest: runtime.encrypted_at_rest,
+        warnings: runtime.warnings,
         updated_at_epoch_ms: manifest
             .updated_at_epoch_ms
             .max(fallback.updated_at_epoch_ms),
@@ -351,6 +363,30 @@ pub fn update_ai_provider_settings(
     load_or_initialize_settings(workspace_root)
 }
 
+pub fn update_workspace_appearance_settings(
+    workspace_root: &Path,
+    input: WorkspaceAppearanceSettingsUpdateInput,
+) -> Result<WorkspaceSettingsDocument, String> {
+    let locale = input.locale.trim();
+    if !matches!(locale, "en" | "zh") {
+        return Err(format!("unsupported locale '{}'", input.locale.trim()));
+    }
+
+    let theme = input.theme.trim();
+    if !matches!(theme, "light" | "dark" | "system") {
+        return Err(format!("unsupported theme '{}'", input.theme.trim()));
+    }
+
+    let mut document = load_or_initialize_settings(workspace_root)?;
+    document.locale = locale.into();
+    document.theme = theme.into();
+    document.editor.auto_save = input.auto_save;
+    document.window.remember_window_state = input.remember_window_state;
+
+    persist_settings(workspace_root, document.clone())?;
+    load_or_initialize_settings(workspace_root)
+}
+
 pub fn write_secret_value(
     workspace_root: &Path,
     input: SecretValueWriteInput,
@@ -378,21 +414,38 @@ pub fn write_secret_value(
         .unwrap_or("Desktop AI runtime credential.");
 
     if trimmed_value.is_empty() {
+        if let Err(error) = delete_secret_from_os_keyring(secret_key) {
+            if os_keyring_backend_supported() {
+                return Err(error);
+            }
+        }
+
         fallback.entries.remove(secret_key);
         manifest
             .key_descriptors
             .retain(|descriptor| descriptor.key != secret_key);
     } else {
-        fallback.entries.insert(
-            secret_key.into(),
-            VaultFallbackEntry {
-                encoding: VaultFallbackEncoding::Utf8Plaintext,
-                encrypted: false,
-                value: trimmed_value,
-                imported_from: "desktop-runtime".into(),
-                imported_at_epoch_ms: timestamp,
-            },
-        );
+        match write_secret_to_os_keyring(secret_key, &trimmed_value) {
+            Ok(()) => {
+                fallback.entries.remove(secret_key);
+            }
+            Err(error) => {
+                if os_keyring_backend_supported() {
+                    return Err(error);
+                }
+
+                fallback.entries.insert(
+                    secret_key.into(),
+                    VaultFallbackEntry {
+                        encoding: VaultFallbackEncoding::Utf8Plaintext,
+                        encrypted: false,
+                        value: trimmed_value,
+                        imported_from: "desktop-runtime".into(),
+                        imported_at_epoch_ms: timestamp,
+                    },
+                );
+            }
+        }
 
         manifest
             .key_descriptors
@@ -408,13 +461,7 @@ pub fn write_secret_value(
             .sort_by(|left, right| left.key.cmp(&right.key));
     }
 
-    manifest.vault_backend = if fallback.entries.is_empty() {
-        SecretVaultBackend::Unconfigured
-    } else {
-        SecretVaultBackend::FileFallback
-    };
-    manifest.encrypted_at_rest = false;
-    manifest.warnings = build_runtime_manifest_warnings(!fallback.entries.is_empty());
+    apply_runtime_vault_state(&mut manifest, &fallback)?;
     persist_secrets_manifest(workspace_root, manifest)?;
     if fallback.entries.is_empty() {
         let path = vault_fallback_path(workspace_root);
@@ -430,13 +477,50 @@ pub fn write_secret_value(
 }
 
 pub fn read_secret_value(workspace_root: &Path, key: &str) -> Result<Option<String>, String> {
-    let fallback = load_or_initialize_vault_fallback(workspace_root)?;
-    let Some(entry) = fallback.entries.get(key) else {
+    let secret_key = key.trim();
+    if secret_key.is_empty() {
+        return Ok(None);
+    }
+
+    match read_secret_from_os_keyring(secret_key) {
+        Ok(Some(value)) => return Ok(Some(value)),
+        Ok(None) => {}
+        Err(error) => {
+            if os_keyring_backend_supported() && !vault_fallback_path(workspace_root).exists() {
+                return Err(error);
+            }
+        }
+    }
+
+    let mut fallback = load_or_initialize_vault_fallback(workspace_root)?;
+    let Some(entry) = fallback.entries.get(secret_key).cloned() else {
         return Ok(None);
     };
 
     match entry.encoding {
-        VaultFallbackEncoding::Utf8Plaintext => Ok(Some(entry.value.clone())),
+        VaultFallbackEncoding::Utf8Plaintext => {
+            let plaintext_value = entry.value.clone();
+            if write_secret_to_os_keyring(secret_key, &plaintext_value).is_ok() {
+                fallback.entries.remove(secret_key);
+
+                if fallback.entries.is_empty() {
+                    let path = vault_fallback_path(workspace_root);
+                    if path.exists() {
+                        let _ = fs::remove_file(&path);
+                    }
+                } else {
+                    let _ = persist_vault_fallback(workspace_root, fallback.clone());
+                }
+
+                if let Ok(mut manifest) = load_or_initialize_secrets_manifest(workspace_root) {
+                    if apply_runtime_vault_state(&mut manifest, &fallback).is_ok() {
+                        let _ = persist_secrets_manifest(workspace_root, manifest);
+                    }
+                }
+            }
+
+            Ok(Some(plaintext_value))
+        }
         VaultFallbackEncoding::LegacySafeStorageBase64 => Ok(None),
     }
 }
@@ -645,21 +729,156 @@ fn default_vault_fallback_document() -> Result<VaultFallbackDocument, String> {
     })
 }
 
-fn build_runtime_manifest_warnings(has_values: bool) -> Vec<String> {
-    if !has_values {
-        return vec![
-            "Vault backend is not configured yet; secret persistence must be wired before production use."
-                .into(),
-            "No plaintext secret values are stored in this manifest.".into(),
-        ];
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SecretStorageState {
+    Keyring,
+    FallbackPlaintext,
+    FallbackOpaque,
+    Missing,
+}
+
+#[derive(Debug, Clone)]
+struct RuntimeVaultState {
+    backend: SecretVaultBackend,
+    encrypted_at_rest: bool,
+    readiness: SecretVaultReadiness,
+    warnings: Vec<String>,
+}
+
+fn resolve_secret_storage_state(
+    secret_key: &str,
+    fallback: &VaultFallbackDocument,
+) -> Result<SecretStorageState, String> {
+    match read_secret_from_os_keyring(secret_key) {
+        Ok(Some(_)) => return Ok(SecretStorageState::Keyring),
+        Ok(None) => {}
+        Err(_) => {}
     }
 
-    vec![
-        "Secrets are currently stored in vault-fallback.json until an encrypted desktop vault backend is wired."
-            .into(),
-        "Desktop AI smoke tests should be validated in the native shell; browser fallback cannot persist or stream secrets honestly."
-            .into(),
-    ]
+    let Some(entry) = fallback.entries.get(secret_key) else {
+        return Ok(SecretStorageState::Missing);
+    };
+
+    Ok(match entry.encoding {
+        VaultFallbackEncoding::Utf8Plaintext => SecretStorageState::FallbackPlaintext,
+        VaultFallbackEncoding::LegacySafeStorageBase64 => SecretStorageState::FallbackOpaque,
+    })
+}
+
+fn evaluate_runtime_vault_state(
+    manifest: &SecretsManifestDocument,
+    fallback: &VaultFallbackDocument,
+) -> Result<RuntimeVaultState, String> {
+    let descriptor_keys = manifest
+        .key_descriptors
+        .iter()
+        .map(|descriptor| descriptor.key.as_str())
+        .collect::<BTreeSet<_>>();
+
+    let mut keyring_active_count = 0usize;
+    let mut fallback_plaintext_active_count = 0usize;
+    let mut fallback_opaque_active_count = 0usize;
+    let mut missing_active_count = 0usize;
+    for descriptor in &manifest.key_descriptors {
+        match resolve_secret_storage_state(&descriptor.key, fallback)? {
+            SecretStorageState::Keyring => keyring_active_count += 1,
+            SecretStorageState::FallbackPlaintext => fallback_plaintext_active_count += 1,
+            SecretStorageState::FallbackOpaque => fallback_opaque_active_count += 1,
+            SecretStorageState::Missing => missing_active_count += 1,
+        }
+    }
+
+    let mut orphan_plaintext_count = 0usize;
+    let mut orphan_opaque_count = 0usize;
+    for (key, entry) in &fallback.entries {
+        if descriptor_keys.contains(key.as_str()) {
+            continue;
+        }
+
+        match entry.encoding {
+            VaultFallbackEncoding::Utf8Plaintext => orphan_plaintext_count += 1,
+            VaultFallbackEncoding::LegacySafeStorageBase64 => orphan_opaque_count += 1,
+        }
+    }
+
+    let descriptor_count = manifest.key_descriptors.len();
+    let fallback_entry_count = fallback.entries.len();
+
+    let backend = if keyring_active_count > 0 {
+        SecretVaultBackend::OsKeyring
+    } else if fallback_entry_count > 0 {
+        SecretVaultBackend::FileFallback
+    } else {
+        SecretVaultBackend::Unconfigured
+    };
+
+    let readiness = if descriptor_count == 0 {
+        if fallback_entry_count > 0 {
+            SecretVaultReadiness::Degraded
+        } else {
+            SecretVaultReadiness::NeedsConfiguration
+        }
+    } else if keyring_active_count == descriptor_count {
+        SecretVaultReadiness::Ready
+    } else if keyring_active_count > 0
+        || fallback_plaintext_active_count > 0
+        || fallback_opaque_active_count > 0
+    {
+        SecretVaultReadiness::Degraded
+    } else {
+        SecretVaultReadiness::NeedsConfiguration
+    };
+
+    let encrypted_at_rest = descriptor_count > 0 && keyring_active_count == descriptor_count;
+
+    let mut warnings = Vec::new();
+    if descriptor_count == 0 && fallback_entry_count == 0 {
+        warnings.push(
+            "Vault backend is not configured yet; secret persistence must be wired before production use."
+                .into(),
+        );
+        warnings.push("No plaintext secret values are stored in this manifest.".into());
+    } else {
+        if missing_active_count > 0 {
+            warnings.push(format!(
+                "{missing_active_count} active secret descriptor(s) are missing values and require re-entry."
+            ));
+        }
+        if fallback_plaintext_active_count + orphan_plaintext_count > 0 {
+            warnings.push(
+                "Plaintext secret values remain in vault-fallback.json; migrate or clear them to remove degraded storage."
+                    .into(),
+            );
+        }
+        let opaque_total = fallback_opaque_active_count + orphan_opaque_count;
+        if opaque_total > 0 {
+            warnings.push(format!(
+                "{opaque_total} opaque legacy safeStorage payload(s) remain in fallback storage and still require manual migration."
+            ));
+        }
+        if warnings.is_empty() && keyring_active_count > 0 {
+            warnings
+                .push("Active secret descriptors are backed by Windows Credential Manager.".into());
+        }
+    }
+
+    Ok(RuntimeVaultState {
+        backend,
+        encrypted_at_rest,
+        readiness,
+        warnings,
+    })
+}
+
+fn apply_runtime_vault_state(
+    manifest: &mut SecretsManifestDocument,
+    fallback: &VaultFallbackDocument,
+) -> Result<(), String> {
+    let runtime = evaluate_runtime_vault_state(manifest, fallback)?;
+    manifest.vault_backend = runtime.backend;
+    manifest.encrypted_at_rest = runtime.encrypted_at_rest;
+    manifest.warnings = runtime.warnings;
+    Ok(())
 }
 
 fn import_provider_map_entry(
@@ -896,6 +1115,231 @@ fn decode_legacy_entry_to_utf8(
             "legacy secure setting {legacy_key} was not valid UTF-8 after base64 decoding: {error}"
         )
     })
+}
+
+fn os_keyring_backend_supported() -> bool {
+    cfg!(target_os = "windows")
+}
+
+fn secret_keyring_target(secret_key: &str) -> String {
+    format!("RoleRoverDesktop/{secret_key}")
+}
+
+fn read_secret_from_os_keyring(secret_key: &str) -> Result<Option<String>, String> {
+    let target = secret_keyring_target(secret_key);
+    #[cfg(target_os = "windows")]
+    {
+        windows_credential::read(&target)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = target;
+        Ok(None)
+    }
+}
+
+fn write_secret_to_os_keyring(secret_key: &str, value: &str) -> Result<(), String> {
+    let target = secret_keyring_target(secret_key);
+    #[cfg(target_os = "windows")]
+    {
+        windows_credential::write(&target, value)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = target;
+        let _ = value;
+        Err("OS keyring backend is only available on Windows in this PR6 slice.".into())
+    }
+}
+
+fn delete_secret_from_os_keyring(secret_key: &str) -> Result<(), String> {
+    let target = secret_keyring_target(secret_key);
+    #[cfg(target_os = "windows")]
+    {
+        windows_credential::delete(&target)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = target;
+        Ok(())
+    }
+}
+
+#[cfg(target_os = "windows")]
+mod windows_credential {
+    use std::{ffi::c_void, ptr};
+
+    const CRED_TYPE_GENERIC: u32 = 1;
+    const CRED_PERSIST_LOCAL_MACHINE: u32 = 2;
+    const ERROR_NOT_FOUND: u32 = 1168;
+
+    #[repr(C)]
+    struct FileTime {
+        low_date_time: u32,
+        high_date_time: u32,
+    }
+
+    #[repr(C)]
+    struct CredentialAttributeW {
+        keyword: *mut u16,
+        flags: u32,
+        value_size: u32,
+        value: *mut u8,
+    }
+
+    #[repr(C)]
+    struct CredentialW {
+        flags: u32,
+        type_: u32,
+        target_name: *mut u16,
+        comment: *mut u16,
+        last_written: FileTime,
+        credential_blob_size: u32,
+        credential_blob: *mut u8,
+        persist: u32,
+        attribute_count: u32,
+        attributes: *mut CredentialAttributeW,
+        target_alias: *mut u16,
+        user_name: *mut u16,
+    }
+
+    #[link(name = "Advapi32")]
+    extern "system" {
+        fn CredWriteW(credential: *const CredentialW, flags: u32) -> i32;
+        fn CredReadW(
+            target_name: *const u16,
+            type_: u32,
+            flags: u32,
+            credential: *mut *mut CredentialW,
+        ) -> i32;
+        fn CredDeleteW(target_name: *const u16, type_: u32, flags: u32) -> i32;
+        fn CredFree(buffer: *mut c_void);
+    }
+
+    #[link(name = "Kernel32")]
+    extern "system" {
+        fn GetLastError() -> u32;
+    }
+
+    fn to_wide_null(value: &str) -> Vec<u16> {
+        value.encode_utf16().chain(std::iter::once(0)).collect()
+    }
+
+    pub fn read(target: &str) -> Result<Option<String>, String> {
+        let target_wide = to_wide_null(target);
+        let mut credential_ptr: *mut CredentialW = ptr::null_mut();
+        let read_ok = unsafe {
+            // SAFETY: target_wide is null-terminated and lives for the call.
+            CredReadW(
+                target_wide.as_ptr(),
+                CRED_TYPE_GENERIC,
+                0,
+                &mut credential_ptr,
+            )
+        };
+
+        if read_ok == 0 {
+            let error_code = unsafe { GetLastError() };
+            if error_code == ERROR_NOT_FOUND {
+                return Ok(None);
+            }
+
+            return Err(format!(
+                "failed to read secret from Windows Credential Manager ({target}): error {error_code}"
+            ));
+        }
+
+        if credential_ptr.is_null() {
+            return Ok(None);
+        }
+
+        let value = unsafe {
+            // SAFETY: credential_ptr is owned by CredReadW success path and valid until CredFree.
+            let credential_ref = &*credential_ptr;
+            let value_bytes = std::slice::from_raw_parts(
+                credential_ref.credential_blob as *const u8,
+                credential_ref.credential_blob_size as usize,
+            )
+            .to_vec();
+            CredFree(credential_ptr as *mut c_void);
+            value_bytes
+        };
+
+        if value.is_empty() {
+            return Ok(Some(String::new()));
+        }
+
+        String::from_utf8(value).map(Some).map_err(|error| {
+            format!("secret from Windows Credential Manager for {target} is not UTF-8: {error}")
+        })
+    }
+
+    pub fn write(target: &str, value: &str) -> Result<(), String> {
+        let mut target_wide = to_wide_null(target);
+        let mut credential_blob = value.as_bytes().to_vec();
+        let credential_blob_size = u32::try_from(credential_blob.len()).map_err(|_| {
+            format!(
+                "secret value for {target} exceeded supported Credential Manager blob size limits"
+            )
+        })?;
+
+        let credential = CredentialW {
+            flags: 0,
+            type_: CRED_TYPE_GENERIC,
+            target_name: target_wide.as_mut_ptr(),
+            comment: ptr::null_mut(),
+            last_written: FileTime {
+                low_date_time: 0,
+                high_date_time: 0,
+            },
+            credential_blob_size,
+            credential_blob: if credential_blob.is_empty() {
+                ptr::null_mut()
+            } else {
+                credential_blob.as_mut_ptr()
+            },
+            persist: CRED_PERSIST_LOCAL_MACHINE,
+            attribute_count: 0,
+            attributes: ptr::null_mut(),
+            target_alias: ptr::null_mut(),
+            user_name: ptr::null_mut(),
+        };
+
+        let write_ok = unsafe {
+            // SAFETY: pointers in credential reference stack/local buffers alive for the duration of the call.
+            CredWriteW(&credential, 0)
+        };
+
+        if write_ok == 0 {
+            let error_code = unsafe { GetLastError() };
+            return Err(format!(
+                "failed to write secret to Windows Credential Manager ({target}): error {error_code}"
+            ));
+        }
+
+        Ok(())
+    }
+
+    pub fn delete(target: &str) -> Result<(), String> {
+        let target_wide = to_wide_null(target);
+        let delete_ok = unsafe {
+            // SAFETY: target_wide is null-terminated and lives for the call.
+            CredDeleteW(target_wide.as_ptr(), CRED_TYPE_GENERIC, 0)
+        };
+
+        if delete_ok == 0 {
+            let error_code = unsafe { GetLastError() };
+            if error_code == ERROR_NOT_FOUND {
+                return Ok(());
+            }
+
+            return Err(format!(
+                "failed to delete secret from Windows Credential Manager ({target}): error {error_code}"
+            ));
+        }
+
+        Ok(())
+    }
 }
 
 fn normalize_provider_key(provider: &str) -> Option<&'static str> {

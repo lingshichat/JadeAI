@@ -3,5 +3,5 @@
   "identifier": "main-capability",
   "description": "Capability for the desktop bootstrap window",
   "windows": ["main"],
-  "permissions": ["core:default", "desktop-core"]
+  "permissions": ["core:default", "dialog:default", "desktop-core"]
 }

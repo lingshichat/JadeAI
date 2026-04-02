@@ -1,5 +1,5 @@
 use rusqlite::{params, Connection, OptionalExtension};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
     collections::HashMap,
@@ -13,6 +13,14 @@ use uuid::Uuid;
 const STORAGE_SCHEMA_VERSION: u32 = 1;
 const WORKSPACE_ROOT_DIR: &str = "workspace";
 const DATABASE_FILE: &str = "rolerover.db";
+const DEFAULT_WINDOW_WIDTH: i64 = 1480;
+const DEFAULT_WINDOW_HEIGHT: i64 = 960;
+const MIN_WINDOW_WIDTH: i64 = 1200;
+const MIN_WINDOW_HEIGHT: i64 = 760;
+const MAX_WINDOW_WIDTH: i64 = 4096;
+const MAX_WINDOW_HEIGHT: i64 = 2160;
+const MIN_WINDOW_COORDINATE: i64 = -16_384;
+const MAX_WINDOW_COORDINATE: i64 = 16_384;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -85,6 +93,32 @@ pub struct TemplateValidationExportWriteResult {
     file_name: String,
     output_path: String,
     bytes_written: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceWindowState {
+    pub width: u32,
+    pub height: u32,
+    pub x: Option<i32>,
+    pub y: Option<i32>,
+    #[serde(default)]
+    pub maximized: bool,
+    #[serde(default)]
+    pub fullscreen: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StoredWorkspaceWindowState {
+    width: Option<i64>,
+    height: Option<i64>,
+    x: Option<i64>,
+    y: Option<i64>,
+    #[serde(alias = "isMaximized")]
+    maximized: Option<bool>,
+    #[serde(alias = "isFullscreen")]
+    fullscreen: Option<bool>,
 }
 
 struct StoragePaths {
@@ -180,35 +214,125 @@ pub fn get_template_validation_snapshot(
 pub fn write_template_validation_export(
     app: &AppHandle,
     file_name: Option<String>,
+    output_path: Option<String>,
     html: String,
 ) -> Result<TemplateValidationExportWriteResult, String> {
-    let paths = resolve_storage_paths(app)?;
-    let exports_dir = paths.workspace_root.join("exports");
-    ensure_storage_directory(&exports_dir)?;
-
-    let sanitized = sanitize_export_file_name(file_name.as_deref().unwrap_or(""));
-    let preferred_name = if sanitized.is_empty() {
-        "template-validation-export.html".to_string()
+    let (resolved_name, resolved_output_path) = if let Some(requested_output_path) = output_path
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        let explicit_output_path = normalize_requested_output_path(requested_output_path)?;
+        let Some(explicit_file_name) = explicit_output_path.file_name() else {
+            return Err("requested export output path must include a file name".into());
+        };
+        (
+            explicit_file_name.to_string_lossy().to_string(),
+            explicit_output_path,
+        )
     } else {
-        sanitized
+        let paths = resolve_storage_paths(app)?;
+        let exports_dir = paths.workspace_root.join("exports");
+        ensure_storage_directory(&exports_dir)?;
+
+        let sanitized = sanitize_export_file_name(file_name.as_deref().unwrap_or(""));
+        let preferred_name = if sanitized.is_empty() {
+            "template-validation-export.html".to_string()
+        } else {
+            sanitized
+        };
+        let output_name = resolve_non_conflicting_name(&exports_dir, &preferred_name)?;
+        (output_name.clone(), exports_dir.join(output_name))
     };
-    let output_name = resolve_non_conflicting_name(&exports_dir, &preferred_name)?;
-    let output_path = exports_dir.join(&output_name);
+
+    if let Some(parent_dir) = resolved_output_path.parent() {
+        if !parent_dir.as_os_str().is_empty() {
+            ensure_storage_directory(&parent_dir.to_path_buf())?;
+        }
+    } else {
+        return Err("requested export output path must include a parent directory".into());
+    }
+
     let bytes = html.into_bytes();
     let bytes_written = bytes.len();
 
-    fs::write(&output_path, bytes).map_err(|error| {
+    fs::write(&resolved_output_path, bytes).map_err(|error| {
         format!(
             "failed to write template validation export {}: {error}",
-            output_path.display()
+            resolved_output_path.display()
         )
     })?;
 
     Ok(TemplateValidationExportWriteResult {
-        file_name: output_name,
-        output_path: path_to_string(&output_path),
+        file_name: resolved_name,
+        output_path: path_to_string(&resolved_output_path),
         bytes_written,
     })
+}
+
+pub fn load_workspace_window_state(
+    app: &AppHandle,
+) -> Result<Option<WorkspaceWindowState>, String> {
+    let paths = resolve_storage_paths(app)?;
+    ensure_storage_directory(&paths.workspace_root)?;
+    let app_version = app.package_info().version.to_string();
+
+    let connection = Connection::open(&paths.database_path).map_err(|error| {
+        format!(
+            "failed to open sqlite database {}: {error}",
+            paths.database_path.display()
+        )
+    })?;
+    configure_connection(&connection)?;
+    bootstrap_schema(&connection)?;
+    seed_workspace_defaults(&connection, &app_version)?;
+
+    let raw_window_state = connection
+        .query_row(
+            "SELECT window_state_json FROM workspace_settings WHERE id = 1",
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()
+        .map_err(|error| format!("failed to query workspace window state: {error}"))?
+        .unwrap_or_else(|| "{}".into());
+
+    parse_workspace_window_state(&raw_window_state)
+}
+
+pub fn persist_workspace_window_state(
+    app: &AppHandle,
+    state: &WorkspaceWindowState,
+) -> Result<(), String> {
+    let paths = resolve_storage_paths(app)?;
+    ensure_storage_directory(&paths.workspace_root)?;
+    let app_version = app.package_info().version.to_string();
+
+    let connection = Connection::open(&paths.database_path).map_err(|error| {
+        format!(
+            "failed to open sqlite database {}: {error}",
+            paths.database_path.display()
+        )
+    })?;
+    configure_connection(&connection)?;
+    bootstrap_schema(&connection)?;
+    seed_workspace_defaults(&connection, &app_version)?;
+
+    let serialized = serde_json::to_string(state)
+        .map_err(|error| format!("failed to serialize workspace window state: {error}"))?;
+
+    connection
+        .execute(
+            r#"
+            UPDATE workspace_settings
+            SET window_state_json = ?, updated_at_epoch_ms = ?
+            WHERE id = 1
+            "#,
+            params![serialized, now_epoch_ms()? as i64],
+        )
+        .map_err(|error| format!("failed to persist workspace window state: {error}"))?;
+
+    Ok(())
 }
 
 fn resolve_storage_paths(app: &AppHandle) -> Result<StoragePaths, String> {
@@ -349,10 +473,7 @@ fn load_document_sections(
                 title: row.get::<_, String>(3)?,
                 sort_order: row.get::<_, i32>(4)?,
                 visible: row.get::<_, i64>(5)? != 0,
-                content: parse_json_or_default(
-                    &row.get::<_, String>(6)?,
-                    "{}",
-                ),
+                content: parse_json_or_default(&row.get::<_, String>(6)?, "{}"),
                 created_at_epoch_ms: row.get::<_, i64>(7)?,
                 updated_at_epoch_ms: row.get::<_, i64>(8)?,
             })
@@ -476,9 +597,57 @@ fn build_sample_template_document(template: &str) -> TemplateValidationDocument 
     }
 }
 
+fn parse_workspace_window_state(raw: &str) -> Result<Option<WorkspaceWindowState>, String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Ok(None);
+    }
+
+    let parsed: StoredWorkspaceWindowState = serde_json::from_str(trimmed)
+        .map_err(|error| format!("failed to parse workspace window state JSON: {error}"))?;
+
+    if parsed.width.is_none()
+        && parsed.height.is_none()
+        && parsed.x.is_none()
+        && parsed.y.is_none()
+        && parsed.maximized.is_none()
+        && parsed.fullscreen.is_none()
+    {
+        return Ok(None);
+    }
+
+    Ok(Some(WorkspaceWindowState {
+        width: normalize_window_dimension(
+            parsed.width,
+            DEFAULT_WINDOW_WIDTH,
+            MIN_WINDOW_WIDTH,
+            MAX_WINDOW_WIDTH,
+        ) as u32,
+        height: normalize_window_dimension(
+            parsed.height,
+            DEFAULT_WINDOW_HEIGHT,
+            MIN_WINDOW_HEIGHT,
+            MAX_WINDOW_HEIGHT,
+        ) as u32,
+        x: normalize_window_coordinate(parsed.x).map(|value| value as i32),
+        y: normalize_window_coordinate(parsed.y).map(|value| value as i32),
+        maximized: parsed.maximized.unwrap_or(false),
+        fullscreen: parsed.fullscreen.unwrap_or(false),
+    }))
+}
+
+fn normalize_window_dimension(value: Option<i64>, fallback: i64, min: i64, max: i64) -> i64 {
+    value.unwrap_or(fallback).clamp(min, max)
+}
+
+fn normalize_window_coordinate(value: Option<i64>) -> Option<i64> {
+    value.map(|raw| raw.clamp(MIN_WINDOW_COORDINATE, MAX_WINDOW_COORDINATE))
+}
+
 fn parse_json_or_default(raw: &str, fallback: &str) -> Value {
     serde_json::from_str::<Value>(raw).unwrap_or_else(|_| {
-        serde_json::from_str::<Value>(fallback).unwrap_or_else(|_| Value::Object(Default::default()))
+        serde_json::from_str::<Value>(fallback)
+            .unwrap_or_else(|_| Value::Object(Default::default()))
     })
 }
 
@@ -499,6 +668,19 @@ fn sanitize_export_file_name(raw: &str) -> String {
         sanitized = format!("export{sanitized}");
     }
     sanitized
+}
+
+fn normalize_requested_output_path(raw: &str) -> Result<PathBuf, String> {
+    let mut candidate = PathBuf::from(raw);
+    let extension = candidate
+        .extension()
+        .map(|value| value.to_string_lossy().to_ascii_lowercase());
+
+    if extension.as_deref() != Some("html") {
+        candidate.set_extension("html");
+    }
+
+    Ok(candidate)
 }
 
 fn resolve_non_conflicting_name(
@@ -733,4 +915,848 @@ fn now_epoch_ms() -> Result<u64, String> {
 
 fn path_to_string(path: &PathBuf) -> String {
     path.to_string_lossy().replace('\\', "/")
+}
+
+// =====================================================
+// Document CRUD operations for Dashboard
+// =====================================================
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DocumentListItem {
+    pub id: String,
+    pub title: String,
+    pub template: String,
+    pub language: String,
+    pub theme_json: String,
+    pub is_default: bool,
+    pub target_job_title: Option<String>,
+    pub target_company: Option<String>,
+    pub created_at_epoch_ms: i64,
+    pub updated_at_epoch_ms: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DocumentDetail {
+    pub id: String,
+    pub title: String,
+    pub template: String,
+    pub language: String,
+    pub theme_json: String,
+    pub is_default: bool,
+    pub target_job_title: Option<String>,
+    pub target_company: Option<String>,
+    pub created_at_epoch_ms: i64,
+    pub updated_at_epoch_ms: i64,
+    pub sections: Vec<DocumentSectionItem>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DocumentSectionItem {
+    pub id: String,
+    pub document_id: String,
+    pub section_type: String,
+    pub title: String,
+    pub sort_order: i32,
+    pub visible: bool,
+    pub content_json: String,
+    pub created_at_epoch_ms: i64,
+    pub updated_at_epoch_ms: i64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateDocumentInput {
+    pub title: Option<String>,
+    pub template: Option<String>,
+    pub language: Option<String>,
+    pub theme_json: Option<String>,
+    pub target_job_title: Option<String>,
+    pub target_company: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateDocumentInput {
+    pub id: String,
+    pub title: Option<String>,
+    pub template: Option<String>,
+    pub language: Option<String>,
+    pub theme_json: Option<String>,
+    pub target_job_title: Option<String>,
+    pub target_company: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportDocumentInput {
+    pub title: String,
+    pub template: Option<String>,
+    pub theme_json: Option<String>,
+    pub language: Option<String>,
+    pub target_job_title: Option<String>,
+    pub target_company: Option<String>,
+    pub sections: Vec<ImportSectionInput>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportSectionInput {
+    pub section_type: String,
+    pub title: String,
+    pub sort_order: Option<i32>,
+    pub visible: Option<bool>,
+    pub content: Value,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveDocumentSectionInput {
+    pub id: String,
+    pub document_id: String,
+    pub section_type: String,
+    pub title: String,
+    pub sort_order: i32,
+    pub visible: bool,
+    pub content: Value,
+    pub created_at_epoch_ms: Option<i64>,
+    pub updated_at_epoch_ms: Option<i64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveDocumentInput {
+    pub id: String,
+    pub title: String,
+    pub template: String,
+    pub language: String,
+    pub theme_json: String,
+    pub target_job_title: Option<String>,
+    pub target_company: Option<String>,
+    pub sections: Vec<SaveDocumentSectionInput>,
+}
+
+pub fn list_documents(app: &AppHandle) -> Result<Vec<DocumentListItem>, String> {
+    let paths = resolve_storage_paths(app)?;
+    ensure_storage_directory(&paths.workspace_root)?;
+    let app_version = app.package_info().version.to_string();
+
+    let connection = Connection::open(&paths.database_path).map_err(|error| {
+        format!(
+            "failed to open sqlite database {}: {error}",
+            paths.database_path.display()
+        )
+    })?;
+    configure_connection(&connection)?;
+    bootstrap_schema(&connection)?;
+    seed_workspace_defaults(&connection, &app_version)?;
+
+    let mut statement = connection
+        .prepare(
+            r#"
+            SELECT
+              id,
+              title,
+              template,
+              language,
+              theme_json,
+              is_default,
+              target_job_title,
+              target_company,
+              created_at_epoch_ms,
+              updated_at_epoch_ms
+            FROM documents
+            ORDER BY updated_at_epoch_ms DESC
+            "#,
+        )
+        .map_err(|error| format!("failed to prepare document list query: {error}"))?;
+
+    let rows = statement
+        .query_map([], |row| {
+            Ok(DocumentListItem {
+                id: row.get::<_, String>(0)?,
+                title: row.get::<_, String>(1)?,
+                template: row.get::<_, String>(2)?,
+                language: row.get::<_, String>(3)?,
+                theme_json: row.get::<_, String>(4)?,
+                is_default: row.get::<_, i64>(5)? != 0,
+                target_job_title: row.get::<_, Option<String>>(6)?,
+                target_company: row.get::<_, Option<String>>(7)?,
+                created_at_epoch_ms: row.get::<_, i64>(8)?,
+                updated_at_epoch_ms: row.get::<_, i64>(9)?,
+            })
+        })
+        .map_err(|error| format!("failed to query documents: {error}"))?;
+
+    let mut documents = Vec::new();
+    for row in rows {
+        documents.push(row.map_err(|error| format!("failed to map document row: {error}"))?);
+    }
+
+    Ok(documents)
+}
+
+pub fn get_document(app: &AppHandle, document_id: &str) -> Result<Option<DocumentDetail>, String> {
+    let paths = resolve_storage_paths(app)?;
+    ensure_storage_directory(&paths.workspace_root)?;
+    let app_version = app.package_info().version.to_string();
+
+    let connection = Connection::open(&paths.database_path).map_err(|error| {
+        format!(
+            "failed to open sqlite database {}: {error}",
+            paths.database_path.display()
+        )
+    })?;
+    configure_connection(&connection)?;
+    bootstrap_schema(&connection)?;
+    seed_workspace_defaults(&connection, &app_version)?;
+
+    let document = connection
+        .query_row(
+            r#"
+            SELECT
+              id,
+              title,
+              template,
+              language,
+              theme_json,
+              is_default,
+              target_job_title,
+              target_company,
+              created_at_epoch_ms,
+              updated_at_epoch_ms
+            FROM documents
+            WHERE id = ?1
+            "#,
+            params![document_id],
+            |row| {
+                Ok(DocumentDetail {
+                    id: row.get::<_, String>(0)?,
+                    title: row.get::<_, String>(1)?,
+                    template: row.get::<_, String>(2)?,
+                    language: row.get::<_, String>(3)?,
+                    theme_json: row.get::<_, String>(4)?,
+                    is_default: row.get::<_, i64>(5)? != 0,
+                    target_job_title: row.get::<_, Option<String>>(6)?,
+                    target_company: row.get::<_, Option<String>>(7)?,
+                    created_at_epoch_ms: row.get::<_, i64>(8)?,
+                    updated_at_epoch_ms: row.get::<_, i64>(9)?,
+                    sections: Vec::new(),
+                })
+            },
+        )
+        .optional()
+        .map_err(|error| format!("failed to query document {document_id}: {error}"))?;
+
+    let mut document = match document {
+        Some(doc) => doc,
+        None => return Ok(None),
+    };
+
+    document.sections = load_document_sections_for_detail(&connection, document_id)?;
+    Ok(Some(document))
+}
+
+fn load_document_sections_for_detail(
+    connection: &Connection,
+    document_id: &str,
+) -> Result<Vec<DocumentSectionItem>, String> {
+    let mut statement = connection
+        .prepare(
+            r#"
+            SELECT
+              id,
+              document_id,
+              section_type,
+              title,
+              sort_order,
+              visible,
+              content_json,
+              created_at_epoch_ms,
+              updated_at_epoch_ms
+            FROM document_sections
+            WHERE document_id = ?1
+            ORDER BY sort_order ASC, created_at_epoch_ms ASC
+            "#,
+        )
+        .map_err(|error| format!("failed to prepare section query: {error}"))?;
+
+    let rows = statement
+        .query_map(params![document_id], |row| {
+            Ok(DocumentSectionItem {
+                id: row.get::<_, String>(0)?,
+                document_id: row.get::<_, String>(1)?,
+                section_type: row.get::<_, String>(2)?,
+                title: row.get::<_, String>(3)?,
+                sort_order: row.get::<_, i32>(4)?,
+                visible: row.get::<_, i64>(5)? != 0,
+                content_json: row.get::<_, String>(6)?,
+                created_at_epoch_ms: row.get::<_, i64>(7)?,
+                updated_at_epoch_ms: row.get::<_, i64>(8)?,
+            })
+        })
+        .map_err(|error| format!("failed to query sections for {document_id}: {error}"))?;
+
+    let mut sections = Vec::new();
+    for row in rows {
+        sections.push(row.map_err(|error| format!("failed to map section row: {error}"))?);
+    }
+
+    Ok(sections)
+}
+
+pub fn create_document(
+    app: &AppHandle,
+    input: CreateDocumentInput,
+) -> Result<DocumentDetail, String> {
+    let paths = resolve_storage_paths(app)?;
+    ensure_storage_directory(&paths.workspace_root)?;
+    let app_version = app.package_info().version.to_string();
+
+    let connection = Connection::open(&paths.database_path).map_err(|error| {
+        format!(
+            "failed to open sqlite database {}: {error}",
+            paths.database_path.display()
+        )
+    })?;
+    configure_connection(&connection)?;
+    bootstrap_schema(&connection)?;
+    seed_workspace_defaults(&connection, &app_version)?;
+
+    let now = now_epoch_ms()? as i64;
+    let document_id = Uuid::new_v4().to_string();
+    let title = input.title.unwrap_or_else(|| "Untitled Resume".to_string());
+    let template = input.template.unwrap_or_else(|| "classic".to_string());
+    let language = input.language.unwrap_or_else(|| "zh".to_string());
+    let theme_json = input.theme_json.unwrap_or_else(|| "{}".to_string());
+
+    connection
+        .execute(
+            r#"
+            INSERT INTO documents (
+              id, title, template, language, theme_json, is_default,
+              target_job_title, target_company, created_at_epoch_ms, updated_at_epoch_ms
+            ) VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6, ?7, ?8, ?8)
+            "#,
+            params![
+                document_id,
+                title,
+                template,
+                language,
+                theme_json,
+                input.target_job_title,
+                input.target_company,
+                now
+            ],
+        )
+        .map_err(|error| format!("failed to create document: {error}"))?;
+
+    // Create default sections for a new resume
+    create_default_sections(&connection, &document_id, &language, now)?;
+
+    Ok(DocumentDetail {
+        id: document_id.clone(),
+        title,
+        template,
+        language,
+        theme_json,
+        is_default: false,
+        target_job_title: input.target_job_title,
+        target_company: input.target_company,
+        created_at_epoch_ms: now,
+        updated_at_epoch_ms: now,
+        sections: load_document_sections_for_detail(&connection, &document_id)?,
+    })
+}
+
+fn create_default_sections(
+    connection: &Connection,
+    document_id: &str,
+    language: &str,
+    now: i64,
+) -> Result<(), String> {
+    let default_sections = [
+        ("personal_info", "Personal Info", 0),
+        ("summary", "Summary", 1),
+        ("work_experience", "Work Experience", 2),
+        ("education", "Education", 3),
+        ("skills", "Skills", 4),
+    ];
+
+    let title_prefix = if language == "zh" {
+        [("个人信息", 0), ("个人简介", 1), ("工作经历", 2), ("教育背景", 3), ("技能特长", 4)]
+    } else {
+        [("Personal Info", 0), ("Summary", 1), ("Work Experience", 2), ("Education", 3), ("Skills", 4)]
+    };
+
+    for (idx, (section_type, default_title, _sort_order)) in default_sections.iter().enumerate() {
+        let section_id = Uuid::new_v4().to_string();
+        let title = title_prefix.get(idx).map(|(t, _)| *t).unwrap_or(default_title);
+        let sort_order = title_prefix.get(idx).map(|(_, s)| *s).unwrap_or(*_sort_order) as i32;
+
+        connection
+            .execute(
+                r#"
+                INSERT INTO document_sections (
+                  id, document_id, section_type, title, sort_order, visible,
+                  content_json, created_at_epoch_ms, updated_at_epoch_ms
+                ) VALUES (?1, ?2, ?3, ?4, ?5, 1, '{}', ?6, ?6)
+                "#,
+                params![section_id, document_id, section_type, title, sort_order, now],
+            )
+            .map_err(|error| format!("failed to create default section: {error}"))?;
+    }
+
+    Ok(())
+}
+
+pub fn update_document(
+    app: &AppHandle,
+    input: UpdateDocumentInput,
+) -> Result<DocumentDetail, String> {
+    let paths = resolve_storage_paths(app)?;
+    ensure_storage_directory(&paths.workspace_root)?;
+    let app_version = app.package_info().version.to_string();
+
+    let connection = Connection::open(&paths.database_path).map_err(|error| {
+        format!(
+            "failed to open sqlite database {}: {error}",
+            paths.database_path.display()
+        )
+    })?;
+    configure_connection(&connection)?;
+    bootstrap_schema(&connection)?;
+    seed_workspace_defaults(&connection, &app_version)?;
+
+    // Check if document exists
+    let exists: bool = connection
+        .query_row(
+            "SELECT 1 FROM documents WHERE id = ?1",
+            params![input.id],
+            |_| Ok(true),
+        )
+        .optional()
+        .map_err(|error| format!("failed to check document existence: {error}"))?
+        .unwrap_or(false);
+
+    if !exists {
+        return Err(format!("document not found: {}", input.id));
+    }
+
+    let now = now_epoch_ms()? as i64;
+
+    // Build dynamic update query
+    let mut updates = Vec::new();
+    let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+
+    if let Some(title) = &input.title {
+        updates.push("title = ?");
+        params_vec.push(Box::new(title.clone()));
+    }
+    if let Some(template) = &input.template {
+        updates.push("template = ?");
+        params_vec.push(Box::new(template.clone()));
+    }
+    if let Some(language) = &input.language {
+        updates.push("language = ?");
+        params_vec.push(Box::new(language.clone()));
+    }
+    if let Some(theme_json) = &input.theme_json {
+        updates.push("theme_json = ?");
+        params_vec.push(Box::new(theme_json.clone()));
+    }
+    if input.target_job_title.is_some() {
+        updates.push("target_job_title = ?");
+        params_vec.push(Box::new(input.target_job_title.clone()));
+    }
+    if input.target_company.is_some() {
+        updates.push("target_company = ?");
+        params_vec.push(Box::new(input.target_company.clone()));
+    }
+
+    if !updates.is_empty() {
+        updates.push("updated_at_epoch_ms = ?");
+        params_vec.push(Box::new(now));
+
+        let query = format!(
+            "UPDATE documents SET {} WHERE id = ?",
+            updates.join(", ")
+        );
+
+        params_vec.push(Box::new(input.id.clone()));
+
+        let params_refs: Vec<&dyn rusqlite::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
+
+        connection
+            .execute(&query, params_refs.as_slice())
+            .map_err(|error| format!("failed to update document: {error}"))?;
+    }
+
+    get_document(app, &input.id)?.ok_or_else(|| format!("document not found after update: {}", input.id))
+}
+
+pub fn delete_document(app: &AppHandle, document_id: &str) -> Result<bool, String> {
+    let paths = resolve_storage_paths(app)?;
+    ensure_storage_directory(&paths.workspace_root)?;
+    let app_version = app.package_info().version.to_string();
+
+    let connection = Connection::open(&paths.database_path).map_err(|error| {
+        format!(
+            "failed to open sqlite database {}: {error}",
+            paths.database_path.display()
+        )
+    })?;
+    configure_connection(&connection)?;
+    bootstrap_schema(&connection)?;
+    seed_workspace_defaults(&connection, &app_version)?;
+
+    let rows_affected = connection
+        .execute(
+            "DELETE FROM documents WHERE id = ?1",
+            params![document_id],
+        )
+        .map_err(|error| format!("failed to delete document: {error}"))?;
+
+    Ok(rows_affected > 0)
+}
+
+pub fn duplicate_document(app: &AppHandle, document_id: &str) -> Result<DocumentDetail, String> {
+    let paths = resolve_storage_paths(app)?;
+    ensure_storage_directory(&paths.workspace_root)?;
+    let app_version = app.package_info().version.to_string();
+
+    let connection = Connection::open(&paths.database_path).map_err(|error| {
+        format!(
+            "failed to open sqlite database {}: {error}",
+            paths.database_path.display()
+        )
+    })?;
+    configure_connection(&connection)?;
+    bootstrap_schema(&connection)?;
+    seed_workspace_defaults(&connection, &app_version)?;
+
+    // Get source document
+    let source = connection
+        .query_row(
+            r#"
+            SELECT
+              title, template, language, theme_json, target_job_title, target_company
+            FROM documents
+            WHERE id = ?1
+            "#,
+            params![document_id],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, Option<String>>(4)?,
+                    row.get::<_, Option<String>>(5)?,
+                ))
+            },
+        )
+        .optional()
+        .map_err(|error| format!("failed to query source document: {error}"))?
+        .ok_or_else(|| format!("source document not found: {document_id}"))?;
+
+    let (title, template, language, theme_json, target_job_title, target_company) = source;
+    let now = now_epoch_ms()? as i64;
+    let new_document_id = Uuid::new_v4().to_string();
+    let new_title = format!("{} (Copy)", title);
+
+    // Create new document
+    connection
+        .execute(
+            r#"
+            INSERT INTO documents (
+              id, title, template, language, theme_json, is_default,
+              target_job_title, target_company, created_at_epoch_ms, updated_at_epoch_ms
+            ) VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6, ?7, ?8, ?8)
+            "#,
+            params![
+                new_document_id,
+                new_title,
+                template,
+                language,
+                theme_json,
+                target_job_title,
+                target_company,
+                now
+            ],
+        )
+        .map_err(|error| format!("failed to duplicate document: {error}"))?;
+
+    // Copy sections
+    let mut statement = connection
+        .prepare(
+            r#"
+            SELECT section_type, title, sort_order, visible, content_json
+            FROM document_sections
+            WHERE document_id = ?1
+            ORDER BY sort_order ASC
+            "#,
+        )
+        .map_err(|error| format!("failed to prepare section copy query: {error}"))?;
+
+    let sections = statement
+        .query_map(params![document_id], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, i32>(2)?,
+                row.get::<_, i64>(3)? != 0,
+                row.get::<_, String>(4)?,
+            ))
+        })
+        .map_err(|error| format!("failed to query sections for copy: {error}"))?;
+
+    for section in sections {
+        let (section_type, title, sort_order, visible, content_json) =
+            section.map_err(|error| format!("failed to map section for copy: {error}"))?;
+        let new_section_id = Uuid::new_v4().to_string();
+
+        connection
+            .execute(
+                r#"
+                INSERT INTO document_sections (
+                  id, document_id, section_type, title, sort_order, visible,
+                  content_json, created_at_epoch_ms, updated_at_epoch_ms
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8)
+                "#,
+                params![
+                    new_section_id,
+                    new_document_id,
+                    section_type,
+                    title,
+                    sort_order,
+                    visible as i64,
+                    content_json,
+                    now
+                ],
+            )
+            .map_err(|error| format!("failed to copy section: {error}"))?;
+    }
+
+    get_document(app, &new_document_id)?.ok_or_else(|| format!("duplicated document not found: {new_document_id}"))
+}
+
+pub fn import_document(
+    app: &AppHandle,
+    input: ImportDocumentInput,
+) -> Result<DocumentDetail, String> {
+    let paths = resolve_storage_paths(app)?;
+    ensure_storage_directory(&paths.workspace_root)?;
+    let app_version = app.package_info().version.to_string();
+
+    let connection = Connection::open(&paths.database_path).map_err(|error| {
+        format!(
+            "failed to open sqlite database {}: {error}",
+            paths.database_path.display()
+        )
+    })?;
+    configure_connection(&connection)?;
+    bootstrap_schema(&connection)?;
+    seed_workspace_defaults(&connection, &app_version)?;
+
+    let now = now_epoch_ms()? as i64;
+    let document_id = Uuid::new_v4().to_string();
+    let template = input.template.unwrap_or_else(|| "classic".to_string());
+    let language = input.language.unwrap_or_else(|| "zh".to_string());
+    let theme_json = input.theme_json.unwrap_or_else(|| "{}".to_string());
+
+    connection
+        .execute(
+            r#"
+            INSERT INTO documents (
+              id, title, template, language, theme_json, is_default,
+              target_job_title, target_company, created_at_epoch_ms, updated_at_epoch_ms
+            ) VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6, ?7, ?8, ?8)
+            "#,
+            params![
+                document_id,
+                input.title,
+                template,
+                language,
+                theme_json,
+                input.target_job_title,
+                input.target_company,
+                now
+            ],
+        )
+        .map_err(|error| format!("failed to import document: {error}"))?;
+
+    // Import sections
+    for (idx, section_input) in input.sections.into_iter().enumerate() {
+        let section_id = Uuid::new_v4().to_string();
+        let sort_order = section_input.sort_order.unwrap_or(idx as i32);
+        let visible = section_input.visible.unwrap_or(true);
+        let content_json = serde_json::to_string(&section_input.content)
+            .map_err(|error| format!("failed to serialize section content: {error}"))?;
+
+        connection
+            .execute(
+                r#"
+                INSERT INTO document_sections (
+                  id, document_id, section_type, title, sort_order, visible,
+                  content_json, created_at_epoch_ms, updated_at_epoch_ms
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8)
+                "#,
+                params![
+                    section_id,
+                    document_id,
+                    section_input.section_type,
+                    section_input.title,
+                    sort_order,
+                    visible as i64,
+                    content_json,
+                    now
+                ],
+            )
+            .map_err(|error| format!("failed to import section: {error}"))?;
+    }
+
+    get_document(app, &document_id)?.ok_or_else(|| format!("imported document not found: {document_id}"))
+}
+
+pub fn rename_document(
+    app: &AppHandle,
+    document_id: &str,
+    new_title: &str,
+) -> Result<DocumentDetail, String> {
+    update_document(
+        app,
+        UpdateDocumentInput {
+            id: document_id.to_string(),
+            title: Some(new_title.to_string()),
+            template: None,
+            language: None,
+            theme_json: None,
+            target_job_title: None,
+            target_company: None,
+        },
+    )
+}
+
+pub fn save_document(app: &AppHandle, input: SaveDocumentInput) -> Result<DocumentDetail, String> {
+    let paths = resolve_storage_paths(app)?;
+    ensure_storage_directory(&paths.workspace_root)?;
+    let app_version = app.package_info().version.to_string();
+
+    let mut connection = Connection::open(&paths.database_path).map_err(|error| {
+        format!(
+            "failed to open sqlite database {}: {error}",
+            paths.database_path.display()
+        )
+    })?;
+    configure_connection(&connection)?;
+    bootstrap_schema(&connection)?;
+    seed_workspace_defaults(&connection, &app_version)?;
+
+    let exists: bool = connection
+        .query_row(
+            "SELECT 1 FROM documents WHERE id = ?1",
+            params![input.id],
+            |_| Ok(true),
+        )
+        .optional()
+        .map_err(|error| format!("failed to check document existence: {error}"))?
+        .unwrap_or(false);
+
+    if !exists {
+        return Err(format!("document not found: {}", input.id));
+    }
+
+    let now = now_epoch_ms()? as i64;
+    let transaction = connection
+        .transaction()
+        .map_err(|error| format!("failed to start save transaction: {error}"))?;
+
+    transaction
+        .execute(
+            r#"
+            UPDATE documents
+            SET title = ?2,
+                template = ?3,
+                language = ?4,
+                theme_json = ?5,
+                target_job_title = ?6,
+                target_company = ?7,
+                updated_at_epoch_ms = ?8
+            WHERE id = ?1
+            "#,
+            params![
+                input.id,
+                input.title,
+                input.template,
+                input.language,
+                input.theme_json,
+                input.target_job_title,
+                input.target_company,
+                now
+            ],
+        )
+        .map_err(|error| format!("failed to update document during save: {error}"))?;
+
+    transaction
+        .execute(
+            "DELETE FROM document_sections WHERE document_id = ?1",
+            params![input.id],
+        )
+        .map_err(|error| format!("failed to clear existing sections during save: {error}"))?;
+
+    for (index, section) in input.sections.iter().enumerate() {
+        let content_json = serde_json::to_string(&section.content)
+            .map_err(|error| format!("failed to serialize section content: {error}"))?;
+        let section_id = if section.id.trim().is_empty() {
+            Uuid::new_v4().to_string()
+        } else {
+            section.id.clone()
+        };
+        let document_id = if section.document_id.trim().is_empty() {
+            input.id.clone()
+        } else {
+            section.document_id.clone()
+        };
+        let created_at_epoch_ms = section.created_at_epoch_ms.unwrap_or(now);
+        let updated_at_epoch_ms = section.updated_at_epoch_ms.unwrap_or(now);
+
+        transaction
+            .execute(
+                r#"
+                INSERT INTO document_sections (
+                  id,
+                  document_id,
+                  section_type,
+                  title,
+                  sort_order,
+                  visible,
+                  content_json,
+                  created_at_epoch_ms,
+                  updated_at_epoch_ms
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+                "#,
+                params![
+                    section_id,
+                    document_id,
+                    section.section_type,
+                    section.title,
+                    section.sort_order.max(index as i32),
+                    section.visible as i64,
+                    content_json,
+                    created_at_epoch_ms,
+                    updated_at_epoch_ms
+                ],
+            )
+            .map_err(|error| format!("failed to save section {}: {error}", section.title))?;
+    }
+
+    transaction
+        .commit()
+        .map_err(|error| format!("failed to commit save transaction: {error}"))?;
+
+    get_document(app, &input.id)?
+        .ok_or_else(|| format!("document not found after save: {}", input.id))
 }

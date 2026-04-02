@@ -17,7 +17,7 @@ const CACHE_DIR: &str = "cache";
 const SECRETS_DIR: &str = "secrets";
 const MANIFESTS_DIR: &str = "manifests";
 const DATABASE_FILE: &str = "rolerover.db";
-const WORKSPACE_SECURE_SETTINGS_FILE: &str = "vault-fallback.json";
+const WORKSPACE_SECRET_MANIFEST_FILE: &str = "secrets-manifest.json";
 const LEGACY_PRODUCT_DIR: &str = "RoleRover";
 const LEGACY_DATABASE_FILE: &str = "jade.db";
 const LEGACY_DATA_DIR: &str = "data";
@@ -169,7 +169,7 @@ fn load_or_initialize_manifest(
         created_at_epoch_ms: now_epoch_ms()?,
         last_opened_at_epoch_ms: now_epoch_ms()?,
         database_rel_path: DATABASE_FILE.into(),
-        secure_settings_rel_path: format!("{SECRETS_DIR}/{WORKSPACE_SECURE_SETTINGS_FILE}"),
+        secure_settings_rel_path: format!("{SECRETS_DIR}/{WORKSPACE_SECRET_MANIFEST_FILE}"),
         documents_rel_path: DOCUMENTS_DIR.into(),
         exports_rel_path: EXPORTS_DIR.into(),
         imports_rel_path: IMPORTS_DIR.into(),
@@ -184,7 +184,11 @@ fn load_or_initialize_manifest(
 fn migrate_manifest_paths(mut manifest: WorkspaceManifest) -> WorkspaceManifest {
     if manifest.secure_settings_rel_path == format!("{SECRETS_DIR}/secure-settings.json") {
         manifest.secure_settings_rel_path =
-            format!("{SECRETS_DIR}/{WORKSPACE_SECURE_SETTINGS_FILE}");
+            format!("{SECRETS_DIR}/{WORKSPACE_SECRET_MANIFEST_FILE}");
+    }
+    if manifest.secure_settings_rel_path == format!("{SECRETS_DIR}/vault-fallback.json") {
+        manifest.secure_settings_rel_path =
+            format!("{SECRETS_DIR}/{WORKSPACE_SECRET_MANIFEST_FILE}");
     }
     manifest
 }

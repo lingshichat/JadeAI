@@ -12,17 +12,21 @@ This contract covers the bootstrap-stage desktop shell in `desktop/`:
 4. Renderer can request representative template validation snapshots, secret inventory snapshots, and native HTML export writes through Tauri commands
 5. Renderer can mutate desktop-local provider config / secrets and start native AI prompt streams through Tauri write commands
 6. Renderer consumes incremental AI events from the desktop-native `desktop://ai-stream` event bridge
-7. Renderer falls back to explicit placeholder data only when Tauri commands are unavailable
-8. UI must surface fallback limitations instead of presenting fallback data as native readiness
+7. Renderer can request a native release-readiness snapshot that reflects bundling, updater, tray, and window-state posture
+8. Renderer falls back to explicit placeholder data only when Tauri commands are unavailable
+9. UI must surface fallback limitations instead of presenting fallback data as native readiness
 
 ## Files
 
 - `desktop/src-tauri/tauri.conf.json`
 - `desktop/src-tauri/src/lib.rs`
 - `desktop/src-tauri/src/ai.rs`
+- `desktop/src-tauri/src/release.rs`
 - `desktop/src-tauri/src/storage.rs`
 - `desktop/src-tauri/src/settings.rs`
+- `desktop/src-tauri/src/workspace.rs`
 - `desktop/src/lib/desktop-api.ts`
+- `desktop/src/lib/desktop-loaders.ts`
 - `desktop/src/lib/template-validation.ts`
 - `desktop/src/routes/root.tsx`
 - `desktop/src/routes/home.tsx`
@@ -48,6 +52,10 @@ pnpm dev:tauri
 pnpm run lint:desktop:active
 pnpm run lint:desktop:shared
 pnpm run verify:desktop:migration
+pnpm run report:desktop:release-readiness
+pnpm run verify:desktop:release-readiness
+pnpm run build:desktop:updater-feed
+pnpm run serve:desktop:updater-feed
 pnpm lint   # repo-wide observation
 ```
 
@@ -162,7 +170,7 @@ Renderer helper:
 
 Rules:
 
-1. `get_bootstrap_context`, `get_workspace_snapshot`, `get_storage_snapshot`, `get_workspace_settings_snapshot`, `get_secret_vault_status`, `get_secret_inventory_snapshot`, `get_importer_dry_run`, and `get_template_validation_snapshot` must route through `invokeWithFallback(...)`.
+1. `get_bootstrap_context`, `get_workspace_snapshot`, `get_storage_snapshot`, `get_workspace_settings_snapshot`, `get_secret_vault_status`, `get_secret_inventory_snapshot`, `get_release_readiness_snapshot`, `get_importer_dry_run`, and `get_template_validation_snapshot` must route through `invokeWithFallback(...)`.
 2. Fallback reads must log the failing command name via `reportDesktopFallback(...)`.
 3. Renderer pages must use `isBrowserFallbackRuntime(context)` instead of string-matching raw runtime text.
 4. Native write commands such as `write_template_validation_export`, `update_ai_provider_settings`, `write_secret_value`, and `start_ai_prompt_stream` must not silently fall back; write failures should surface as explicit UI errors.
@@ -187,10 +195,10 @@ Secret inventory read payload:
 
 ```json
 {
-  "backend": "file_fallback",
-  "encryptedAtRest": false,
+  "backend": "os_keyring",
+  "encryptedAtRest": true,
   "warnings": [
-    "Secrets are currently stored in vault-fallback.json until an encrypted desktop vault backend is wired."
+    "Active secret descriptors are backed by Windows Credential Manager."
   ],
   "updatedAtEpochMs": 1710000000000,
   "entries": [
@@ -273,7 +281,7 @@ Rules:
 
 1. `get_secret_inventory_snapshot` may expose secret descriptors and presence only; it must never return plaintext secret values.
 2. `update_ai_provider_settings` persists the selected provider's `baseUrl` / `model` under the desktop workspace settings document and may also flip `defaultProvider`.
-3. `write_secret_value` writes the provided secret into the workspace vault fallback contract and updates the manifest descriptor list; clearing or missing values must not silently claim success.
+3. `write_secret_value` must prefer the Windows OS keyring backend for new writes, update the manifest descriptor list, and only retain fallback storage when migration debt still exists; clearing or missing values must not silently claim success.
 4. `start_ai_prompt_stream` resolves provider config and secret from the desktop workspace contract, not from browser local storage or web request headers.
 5. PR5 validates the OpenAI-compatible streaming path first. Unsupported providers must fail explicitly instead of pretending native parity.
 6. Renderer consumers must filter `desktop://ai-stream` events by `requestId` and build the final transcript from `deltaText` / `accumulatedText`.
@@ -347,7 +355,8 @@ Write input:
 
 ```json
 {
-  "fileName": "classic-contract-baseline-classic",
+  "fileName": "classic-contract-baseline-classic.html",
+  "outputPath": "C:/Users/Avery/Desktop/classic-contract-baseline-classic.html",
   "html": "<!DOCTYPE html>..."
 }
 ```
@@ -366,8 +375,89 @@ Rules:
 
 1. `get_template_validation_snapshot` must return representative `classic` / `modern` documents from workspace storage when present, and may fill gaps with clearly marked native sample documents (`metadata.isSample=true`).
 2. `desktop/src/lib/template-validation.ts` must normalize the snapshot into shared `Resume` input before calling the unified template renderer.
-3. `write_template_validation_export` must only write inside the workspace `exports` directory, sanitize the requested file name, enforce `.html`, and return the final resolved output path.
+3. `write_template_validation_export` may write to a user-selected system path when `outputPath` is provided; otherwise it may fall back to the workspace `exports` directory for validation flows. In both cases it must normalize `.html`, reject invalid parentless paths, and return the final resolved output path.
 4. Browser fallback may preview representative sample HTML, but it must not claim native export success.
+
+## Window State Contract
+
+Files:
+
+- `desktop/src-tauri/src/lib.rs`
+- `desktop/src-tauri/src/storage.rs`
+- `desktop/src-tauri/src/settings.rs`
+- `desktop/src-tauri/src/workspace.rs`
+
+Rules:
+
+1. Native startup may restore the main window geometry from `workspace_settings.window_state_json` only when the persisted document still has `window.rememberWindowState=true` and the stored JSON is valid; imported legacy window-state payloads must be rewritten through this command path to prove the runtime read them.
+2. Restoration applies the previously recorded normal bounds (after clamping to the desktop shell's supported minima/maxima) and replays any persisted `maximized` or `fullscreen` flags without overwriting the normal-bounds snapshot so the next session can resume at the same size if the user exits in a maximized/fullscreen mode.
+3. Native window events such as `Moved`, `Resized`, and `ScaleFactorChanged` must refresh the in-memory normal-bounds snapshot, while `CloseRequested` / `Destroyed` must persist the latest normal bounds plus any `maximized` / `fullscreen` state into `workspace_settings.window_state_json`.
+4. Browser fallback may surface the `rememberWindowState` toggle but must never claim real persistence is active.
+
+## Tray Contract
+
+Files:
+
+- `desktop/src-tauri/src/lib.rs`
+- `desktop/src-tauri/tauri.conf.json`
+
+Rules:
+
+1. Native startup may create a single system tray icon only when the default window icon is available; tray boot failures must log explicitly and must not abort the desktop shell.
+2. The tray menu must expose concrete shell actions (`Show RoleRover`, `Hide To Tray`, `Quit`) against the main window instead of placeholder items.
+3. Tray click handling may restore and focus the hidden main window; menu-driven quit must exit the shell cleanly instead of leaving background zombie processes.
+4. Browser fallback must never imply that tray affordances are active or testable there.
+
+## Release Readiness Contract
+
+Files:
+
+- `desktop/src-tauri/src/release.rs`
+- `desktop/src-tauri/src/lib.rs`
+- `desktop/src-tauri/tauri.conf.json`
+- `desktop/src/lib/desktop-api.ts`
+- `desktop/src/lib/desktop-loaders.ts`
+- `desktop/src/routes/settings.tsx`
+- `scripts/verify-desktop-release-readiness.mjs`
+
+Rust command:
+
+- `get_release_readiness_snapshot`
+- `check_for_app_update`
+
+Read payload:
+
+```json
+{
+  "bundleActive": true,
+  "updaterPluginWired": true,
+  "updaterConfigDeclared": true,
+  "updaterConfigured": true,
+  "updaterArtifactsEnabled": true,
+  "updaterArtifactsMode": "current",
+  "updaterEndpointCount": 1,
+  "updaterPubkeyConfigured": true,
+  "updaterDangerousInsecureTransport": true,
+  "updaterUsesLocalhost": true,
+  "updaterWindowsInstallMode": "passive",
+  "trayIconReady": true,
+  "rememberWindowStateEnabled": true,
+  "blockers": [],
+  "warnings": [
+    "Updater config allows insecure transport so the local smoke feed can run over HTTP.",
+    "Updater endpoint currently targets localhost, which is suitable for local smoke only."
+  ],
+}
+```
+
+Rules:
+
+1. The native desktop runtime must wire `tauri-plugin-updater` during bootstrap even if the renderer does not expose a user-facing update button yet.
+2. `tauri.conf.json` must declare `plugins.updater` with a feed endpoint and public key, and any localhost / insecure transport fallback must stay visible as warnings instead of being treated as production-ready hosting.
+3. `bundle.createUpdaterArtifacts` must be enabled so the native build emits signed updater payloads instead of only wiring the runtime plugin.
+4. `settings.tsx` must surface release blockers and warnings from the snapshot so PR6 can track truthful release posture inside the native shell.
+5. Browser fallback must return an explicitly blocked placeholder snapshot and must not imply real release readiness.
+6. `check_for_app_update` must fail explicitly when the feed is unreachable and must return parsed remote version metadata when the local smoke feed is running.
 
 ## UI Truthfulness Contract
 
@@ -386,7 +476,7 @@ Rules:
    - `migrationStateNeedsDesktop`
 3. `library.tsx` must not present fallback storage as initialized native storage.
 4. `library.tsx` template validation lane must show whether representative documents came from workspace data, native samples, or browser fallback.
-5. `library.tsx` must disable native export actions in browser fallback mode and surface write errors instead of silently succeeding.
+5. `library.tsx` must disable native export actions in browser fallback mode and surface saved, cancelled, and write-error outcomes explicitly instead of silently succeeding.
 6. `settings.tsx` must not present fallback vault/settings snapshots as proof of native desktop readiness.
 7. `settings.tsx` AI controls must disable native config writes and prompt streaming in browser fallback mode.
 8. `settings.tsx` must show whether the selected provider secret is configured and must state that PR5 validates the OpenAI-compatible streaming path first.
@@ -400,7 +490,11 @@ Rules:
 | Renderer -> workspace/storage/settings snapshots | Matching Tauri commands available | Real native paths and statuses | Command throws / browser runtime | Placeholder snapshot returned; page must mark it as fallback-only |
 | Renderer -> `get_secret_inventory_snapshot` | Native secrets manifest or fallback exists | Descriptor-only inventory returns, with no plaintext secret values | Command throws / browser runtime | Placeholder inventory returns and UI marks the surface as fallback-only |
 | Renderer -> `get_template_validation_snapshot` | Workspace has representative templates | Representative documents render from workspace data | No representative docs available | Rust returns native sample docs and UI labels the source honestly |
-| Renderer -> `write_template_validation_export` | Valid HTML + writable exports dir | HTML file lands in workspace `exports` and receipt returns final path | Browser fallback / write failure / invalid path | Export button stays disabled in fallback or UI shows explicit error state |
+| Renderer -> `write_template_validation_export` | Valid HTML + writable user-selected path or workspace exports dir | HTML file lands at the selected system path (or workspace fallback path) and receipt returns final path | Browser fallback / cancelled save dialog / write failure / invalid path | Export button stays disabled in fallback; UI shows cancelled or explicit error state |
+| Native startup / window events -> `workspace_settings.window_state_json` | Desktop runtime active + `rememberWindowState=true` | Main window reapplies the most recent normal bounds plus any `maximized`/`fullscreen` flags, while move/resize/close events persist the updated geometry | Browser fallback / invalid stored JSON / native window event wiring failure | Runtime logs a warning, fallback mode stays explicit, and the shell reverts to the default geometry without claiming persistence |
+| Native startup / tray events -> system tray icon + tray menu | Desktop runtime active + default icon available | Tray icon exposes Show / Hide To Tray / Quit actions and tray interaction can restore the main window | Browser fallback / missing icon / tray init failure | Runtime logs the tray failure explicitly and keeps the main window shell usable without pretending tray support |
+| Renderer -> `get_release_readiness_snapshot` | Native desktop runtime + Tauri config available | Settings page shows the real bundling/updater/tray/window-state posture with blockers when needed | Browser fallback / config gaps / missing updater feed/signing | Fallback stays explicitly blocked and native UI keeps incomplete updater chains visible instead of implying parity |
+| Renderer -> `check_for_app_update` | Native desktop runtime + running updater feed | Settings page reports current/latest versions or an available update without leaving the app | Browser fallback / unreachable feed / invalid latest.json | UI shows an explicit updater check error and keeps local smoke limitations visible |
 | Renderer -> `update_ai_provider_settings` | Provider, base URL, model are valid | Settings document is persisted and subsequent reads reflect the change | Browser fallback / invalid provider / empty model or base URL | UI shows explicit error; no silent fallback write |
 | Renderer -> `write_secret_value` | Valid secret key contract + non-empty value | Secret manifest and vault fallback update together | Browser fallback / invalid key / file write failure | UI shows explicit error; plaintext secret never echoes back to renderer |
 | Renderer -> `start_ai_prompt_stream` | Supported provider + saved secret + prompt | Start receipt returns and `desktop://ai-stream` emits started / delta / completed events | Unsupported provider / missing secret / upstream error | UI shows explicit failure state and event log captures the error |
@@ -413,7 +507,10 @@ Rules:
 - `pnpm dev:tauri` starts Vite on `1420`
 - `root.tsx` shows native runtime badge
 - `library.tsx` shows real SQLite version instead of `browser-fallback`
-- `library.tsx` renders representative `classic` / `modern` previews and writes HTML exports into the workspace `exports` directory
+- `library.tsx` renders representative `classic` / `modern` previews and writes HTML exports to a user-selected system path through the native save dialog
+- Desktop window restores the last geometry (including maximized/fullscreen state) after restart and honors the `rememberWindowState` toggle.
+- Native tray icon can hide the window, restore it from the tray, and quit the desktop shell without placeholder behavior.
+- `build:desktop:updater-feed` emits a signed local `latest.json`, and settings can perform a native updater check against the local smoke feed.
 - `settings.tsx` saves an OpenAI-compatible provider config + API key into the desktop workspace and streams an assistant response through `desktop://ai-stream`
 
 ### Base
@@ -422,6 +519,9 @@ Rules:
 - Pages still render, but root/home/library/settings all display fallback messaging and limitations
 - Template validation previews may render fallback samples, but export actions remain disabled
 - Settings may preview provider contracts, but config writes and native AI streaming stay unavailable
+- Tray behavior is intentionally unavailable in browser fallback; tray checks wait for the native desktop shell.
+- Release readiness stays blocked in browser fallback and does not claim real updater posture.
+- Local updater smoke may still warn that transport is HTTP/localhost until a hosted HTTPS feed replaces it.
 
 ### Bad
 
@@ -429,8 +529,11 @@ Rules:
 - Renderer infers fallback by string-matching ad hoc runtime text only
 - Fallback snapshots render `created` / `cleanWorkspace` / `Initialized` without a fallback warning
 - Export UI claims success without a native write receipt from `write_template_validation_export`
+- Tray menu items exist but do nothing, or tray boot failure silently removes the feature without logging.
+- Settings UI implies updater parity even though feed/signing/artifact requirements are still missing.
 - Settings UI claims a provider is stream-ready without a saved secret or while browser fallback is active
 - Renderer consumes all `desktop://ai-stream` events globally without filtering by `requestId`
+- Desktop window always opens at the default size and ignores the previously persisted maximized/fullscreen state.
 
 ## Required Tests And Assertion Points
 
@@ -440,12 +543,19 @@ Manual assertions:
 2. In the desktop shell, confirm root banner shows native runtime mode and no fallback limitations.
 3. In a browser-only renderer context, confirm root banner shows fallback mode and limitations.
 4. In the desktop shell, confirm `library.tsx` shows the template validation lane with representative `classic` / `modern` templates.
-5. Trigger HTML export from the native desktop shell and confirm the returned path points inside the workspace `exports` directory.
-6. Confirm browser fallback keeps the template validation lane visible but disables native export.
-7. In the native desktop shell, save an OpenAI-compatible provider config and API key from `settings.tsx`.
-8. Run the native AI smoke test from `settings.tsx` and confirm the event log shows started / delta / completed (or explicit error) for the returned `requestId`.
-9. Confirm browser fallback keeps the AI controls visible but disables config writes and native streaming.
-10. Confirm library/settings copy changes between native and fallback modes.
+5. Trigger HTML export from the native desktop shell, choose a custom system save path, and confirm the returned path matches the selected location.
+6. Trigger the same export flow and cancel the save dialog; confirm the UI reports a cancelled outcome and no file is written.
+7. Confirm browser fallback keeps the template validation lane visible but disables native export.
+8. In the native desktop shell, save an OpenAI-compatible provider config and API key from `settings.tsx`.
+9. Run the native AI smoke test from `settings.tsx` and confirm the event log shows started / delta / completed (or explicit error) for the returned `requestId`.
+10. Confirm browser fallback keeps the AI controls visible but disables config writes and native streaming.
+11. Confirm library/settings copy changes between native and fallback modes.
+12. Resize or move the desktop window, close the app, and confirm the next launch restores the latest normal bounds while replaying any maximized/fullscreen state active at exit.
+13. Toggle between normal, maximized, and fullscreen states, close the shell, and confirm the restored session replays the flags while keeping the normal bounds updated for future runs.
+14. In the native desktop shell, confirm the tray icon can hide the window, restore it from tray interaction, and exit cleanly through the tray menu.
+15. In the native desktop shell, confirm settings show updater wiring plus local-smoke warnings for localhost / insecure transport.
+16. Run `pnpm run verify:desktop:release-readiness` and confirm it passes with warnings once updater feed, signing pubkey, and artifacts are configured.
+17. Run `pnpm run build:desktop:updater-feed`, start `pnpm run serve:desktop:updater-feed`, and confirm Settings can execute a native updater check against the local smoke feed.
 
 Automated / static assertions:
 

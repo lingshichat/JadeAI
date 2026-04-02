@@ -2,6 +2,7 @@ mod ai;
 mod domain;
 mod importer;
 mod legacy_import_contract;
+mod release;
 mod settings;
 mod storage;
 mod workspace;
@@ -12,12 +13,17 @@ use importer::{
     MigrationExecutionResult, StagingExecutionResult,
 };
 use legacy_import_contract::LegacyImportContract;
+use release::{AppUpdateCheckResult, ReleaseReadinessSnapshot};
 use serde::Serialize;
 use settings::{
     ProviderConfigUpdateInput, SecretInventorySnapshot, SecretValueWriteInput, SecretVaultStatus,
-    WorkspaceSettingsDocument,
+    WorkspaceAppearanceSettingsUpdateInput, WorkspaceSettingsDocument,
 };
-use storage::{StorageSnapshot, TemplateValidationExportWriteResult, TemplateValidationSnapshot};
+use storage::{
+    CreateDocumentInput, DocumentDetail, DocumentListItem, ImportDocumentInput, SaveDocumentInput,
+    StorageSnapshot, TemplateValidationExportWriteResult, TemplateValidationSnapshot,
+    UpdateDocumentInput,
+};
 use tauri::Manager;
 use workspace::WorkspaceSnapshot;
 
@@ -92,6 +98,70 @@ fn get_storage_snapshot(app: tauri::AppHandle) -> Result<StorageSnapshot, String
 }
 
 #[tauri::command]
+fn list_documents(app: tauri::AppHandle) -> Result<Vec<DocumentListItem>, String> {
+    storage::list_documents(&app)
+}
+
+#[tauri::command]
+fn get_document(
+    app: tauri::AppHandle,
+    document_id: String,
+) -> Result<Option<DocumentDetail>, String> {
+    storage::get_document(&app, &document_id)
+}
+
+#[tauri::command]
+fn create_document(
+    app: tauri::AppHandle,
+    input: CreateDocumentInput,
+) -> Result<DocumentDetail, String> {
+    storage::create_document(&app, input)
+}
+
+#[tauri::command]
+fn update_document_metadata(
+    app: tauri::AppHandle,
+    input: UpdateDocumentInput,
+) -> Result<DocumentDetail, String> {
+    storage::update_document(&app, input)
+}
+
+#[tauri::command]
+fn save_document(app: tauri::AppHandle, input: SaveDocumentInput) -> Result<DocumentDetail, String> {
+    storage::save_document(&app, input)
+}
+
+#[tauri::command]
+fn delete_document(app: tauri::AppHandle, document_id: String) -> Result<bool, String> {
+    storage::delete_document(&app, &document_id)
+}
+
+#[tauri::command]
+fn duplicate_document(
+    app: tauri::AppHandle,
+    document_id: String,
+) -> Result<DocumentDetail, String> {
+    storage::duplicate_document(&app, &document_id)
+}
+
+#[tauri::command]
+fn import_document(
+    app: tauri::AppHandle,
+    input: ImportDocumentInput,
+) -> Result<DocumentDetail, String> {
+    storage::import_document(&app, input)
+}
+
+#[tauri::command]
+fn rename_document(
+    app: tauri::AppHandle,
+    document_id: String,
+    new_title: String,
+) -> Result<DocumentDetail, String> {
+    storage::rename_document(&app, &document_id, &new_title)
+}
+
+#[tauri::command]
 fn get_template_validation_snapshot(
     app: tauri::AppHandle,
 ) -> Result<TemplateValidationSnapshot, String> {
@@ -102,9 +172,10 @@ fn get_template_validation_snapshot(
 fn write_template_validation_export(
     app: tauri::AppHandle,
     file_name: Option<String>,
+    output_path: Option<String>,
     html: String,
 ) -> Result<TemplateValidationExportWriteResult, String> {
-    storage::write_template_validation_export(&app, file_name, html)
+    storage::write_template_validation_export(&app, file_name, output_path, html)
 }
 
 #[tauri::command]
@@ -128,12 +199,33 @@ fn get_secret_inventory_snapshot(app: tauri::AppHandle) -> Result<SecretInventor
 }
 
 #[tauri::command]
+fn get_release_readiness_snapshot(
+    app: tauri::AppHandle,
+) -> Result<ReleaseReadinessSnapshot, String> {
+    release::get_release_readiness_snapshot(&app)
+}
+
+#[tauri::command]
+async fn check_for_app_update(app: tauri::AppHandle) -> Result<AppUpdateCheckResult, String> {
+    release::check_for_app_update(&app).await
+}
+
+#[tauri::command]
 fn update_ai_provider_settings(
     app: tauri::AppHandle,
     input: ProviderConfigUpdateInput,
 ) -> Result<WorkspaceSettingsDocument, String> {
     let workspace_root = resolve_workspace_root(&app)?;
     settings::update_ai_provider_settings(&workspace_root, input)
+}
+
+#[tauri::command]
+fn update_workspace_appearance_settings(
+    app: tauri::AppHandle,
+    input: WorkspaceAppearanceSettingsUpdateInput,
+) -> Result<WorkspaceSettingsDocument, String> {
+    let workspace_root = resolve_workspace_root(&app)?;
+    settings::update_workspace_appearance_settings(&workspace_root, input)
 }
 
 #[tauri::command]
@@ -231,18 +323,31 @@ fn build_importer_snapshot(
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             get_bootstrap_context,
             get_workspace_snapshot,
             get_domain_contract_summary,
             get_legacy_import_contract,
             get_storage_snapshot,
+            list_documents,
+            get_document,
+            create_document,
+            update_document_metadata,
+            save_document,
+            delete_document,
+            duplicate_document,
+            import_document,
+            rename_document,
             get_template_validation_snapshot,
             write_template_validation_export,
             get_workspace_settings_snapshot,
             get_secret_vault_status,
             get_secret_inventory_snapshot,
+            get_release_readiness_snapshot,
+            check_for_app_update,
             update_ai_provider_settings,
+            update_workspace_appearance_settings,
             write_secret_value,
             start_ai_prompt_stream,
             get_importer_dry_run,

@@ -2,12 +2,14 @@ import { Link, createRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  checkForAppUpdate,
   getSecretVaultStatus,
   isBrowserFallbackRuntime,
   listenToAiStreamEvents,
   startAiPromptStream,
   updateAiProviderSettings,
   writeSecretValue,
+  type AppUpdateCheckResult,
   type DesktopAiStreamEvent,
 } from "../lib/desktop-api";
 import { loadSettingsRouteData } from "../lib/desktop-loaders";
@@ -54,6 +56,7 @@ function SettingsRoute() {
     vault,
     secretInventory,
     domainContract,
+    releaseReadiness,
   } = settingsRoute.useLoaderData();
   const runtimeIsFallback = isBrowserFallbackRuntime(context);
   const [activeTab, setActiveTab] = useState<SettingsTab>("providers");
@@ -72,6 +75,9 @@ function SettingsRoute() {
   const [isSavingConfig, setIsSavingConfig] = useState(false);
   const [isSavingSecret, setIsSavingSecret] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+  const [updateCheckResult, setUpdateCheckResult] = useState<AppUpdateCheckResult | null>(null);
+  const [updateCheckError, setUpdateCheckError] = useState<string | null>(null);
   const activeRequestIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -92,6 +98,7 @@ function SettingsRoute() {
     vault: vaultState,
     domainContract,
     secretInventory: secretInventoryState,
+    releaseReadiness,
   });
   const providerEntries = useMemo(
     () => buildProviderRuntimeReadModel(settingsState, domainContract),
@@ -121,6 +128,24 @@ function SettingsRoute() {
         ? t("vaultStatusDegraded")
         : t("vaultStatusNeedsConfiguration");
   const settingsBodyKey = runtimeIsFallback ? "settingsBodyFallback" : "settingsBody";
+  const releaseReadinessTone =
+    releaseReadiness.blockers.length > 0
+      ? "danger"
+      : releaseReadiness.warnings.length > 0
+        ? "warn"
+        : "success";
+  const releaseReadinessLabel =
+    releaseReadiness.blockers.length > 0
+      ? t("releaseReadinessStatusBlocked")
+      : releaseReadiness.warnings.length > 0
+        ? t("releaseReadinessStatusWarn")
+        : t("releaseReadinessStatusReady");
+  const updaterArtifactsModeLabel =
+    releaseReadiness.updaterArtifactsMode === "current"
+      ? t("updaterArtifactsModeCurrent")
+      : releaseReadiness.updaterArtifactsMode === "v1_compatible"
+        ? t("updaterArtifactsModeV1Compatible")
+        : t("updaterArtifactsModeDisabled");
 
   useEffect(() => {
     if (!providerEntries.some((entry) => entry.provider === selectedProvider) && providerEntries[0]) {
@@ -329,6 +354,23 @@ function SettingsRoute() {
     setNotice(null);
   }
 
+  async function handleCheckForUpdates() {
+    setIsCheckingUpdate(true);
+    setUpdateCheckError(null);
+
+    try {
+      const result = await checkForAppUpdate();
+      setUpdateCheckResult(result);
+    } catch (error) {
+      setUpdateCheckResult(null);
+      setUpdateCheckError(
+        error instanceof Error ? error.message : t("updaterCheckFailed"),
+      );
+    } finally {
+      setIsCheckingUpdate(false);
+    }
+  }
+
   return (
     <div className="settings-modal-backdrop">
       <section className="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
@@ -341,7 +383,7 @@ function SettingsRoute() {
             <p className="settings-modal__body">{t(settingsBodyKey)}</p>
           </div>
 
-          <Link className="settings-close" to="/library" aria-label={t("settingsClose")}>
+          <Link className="settings-close" to="/dashboard" aria-label={t("settingsClose")}>
             <CloseIcon />
           </Link>
         </header>
@@ -802,6 +844,155 @@ function SettingsRoute() {
                   <div className="empty-state empty-state--compact">
                     <h3>{t("noWarnings")}</h3>
                     <p>{t("vaultNoWarnings")}</p>
+                  </div>
+                )}
+              </section>
+
+              <section className="subsurface">
+                <div className="subsurface__header">
+                  <div>
+                    <p className="collection-card__badge">{t("releaseReadinessTitle")}</p>
+                    <h3>{t("releaseReadinessHeader")}</h3>
+                  </div>
+                  <span className={`status-badge status-badge--${releaseReadinessTone}`}>
+                    {releaseReadinessLabel}
+                  </span>
+                </div>
+                <p>{t("releaseReadinessBody")}</p>
+                <dl className="setting-list">
+                  <div className="setting-row">
+                    <dt>{t("bundleActiveLabel")}</dt>
+                    <dd>{releaseReadiness.bundleActive ? t("yes") : t("no")}</dd>
+                  </div>
+                  <div className="setting-row">
+                    <dt>{t("updaterPluginWiredLabel")}</dt>
+                    <dd>{releaseReadiness.updaterPluginWired ? t("yes") : t("no")}</dd>
+                  </div>
+                  <div className="setting-row">
+                    <dt>{t("updaterConfigDeclaredLabel")}</dt>
+                    <dd>{releaseReadiness.updaterConfigDeclared ? t("yes") : t("no")}</dd>
+                  </div>
+                  <div className="setting-row">
+                    <dt>{t("updaterConfiguredLabel")}</dt>
+                    <dd>{releaseReadiness.updaterConfigured ? t("yes") : t("no")}</dd>
+                  </div>
+                  <div className="setting-row">
+                    <dt>{t("updaterArtifactsEnabledLabel")}</dt>
+                    <dd>{releaseReadiness.updaterArtifactsEnabled ? t("yes") : t("no")}</dd>
+                  </div>
+                  <div className="setting-row">
+                    <dt>{t("trayIconReadyLabel")}</dt>
+                    <dd>{releaseReadiness.trayIconReady ? t("yes") : t("no")}</dd>
+                  </div>
+                  <div className="setting-row">
+                    <dt>{t("rememberWindowState")}</dt>
+                    <dd>{releaseReadiness.rememberWindowStateEnabled ? t("yes") : t("no")}</dd>
+                  </div>
+                </dl>
+                {releaseReadiness.blockers.length > 0 ? (
+                  <div className="subsurface-grid">
+                    {releaseReadiness.blockers.map((blocker) => (
+                      <article key={blocker} className="subsurface subsurface--warn">
+                        <p className="collection-card__badge">{t("releaseBlockersTitle")}</p>
+                        <h3>{t("releaseReadinessStatusBlocked")}</h3>
+                        <p>{blocker}</p>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="empty-state empty-state--compact">
+                    <h3>{t("releaseReadinessStatusReady")}</h3>
+                    <p>{t("releaseNoBlockers")}</p>
+                  </div>
+                )}
+              </section>
+
+              <section className="subsurface">
+                <div className="subsurface__header">
+                  <div>
+                    <p className="collection-card__badge">{t("updaterContractTitle")}</p>
+                    <h3>{t("updaterContractHeader")}</h3>
+                  </div>
+                  <span className="status-badge status-badge--muted">
+                    {t("updaterEndpointCountLabel")}: {releaseReadiness.updaterEndpointCount}
+                  </span>
+                </div>
+                <p>{t("updaterContractBody")}</p>
+                <dl className="setting-list">
+                  <div className="setting-row">
+                    <dt>{t("updaterArtifactsModeLabel")}</dt>
+                    <dd>{updaterArtifactsModeLabel}</dd>
+                  </div>
+                  <div className="setting-row">
+                    <dt>{t("updaterEndpointCountLabel")}</dt>
+                    <dd>{releaseReadiness.updaterEndpointCount}</dd>
+                  </div>
+                  <div className="setting-row">
+                    <dt>{t("updaterPubkeyConfiguredLabel")}</dt>
+                    <dd>{releaseReadiness.updaterPubkeyConfigured ? t("yes") : t("no")}</dd>
+                  </div>
+                  <div className="setting-row">
+                    <dt>{t("updaterTransportLabel")}</dt>
+                    <dd>{releaseReadiness.updaterDangerousInsecureTransport ? t("updaterTransportInsecure") : t("updaterTransportSecure")}</dd>
+                  </div>
+                  <div className="setting-row">
+                    <dt>{t("updaterEndpointScopeLabel")}</dt>
+                    <dd>{releaseReadiness.updaterUsesLocalhost ? t("updaterEndpointScopeLocal") : t("updaterEndpointScopeHosted")}</dd>
+                  </div>
+                  <div className="setting-row">
+                    <dt>{t("updaterInstallModeLabel")}</dt>
+                    <dd>{releaseReadiness.updaterWindowsInstallMode ?? t("notAvailable")}</dd>
+                  </div>
+                </dl>
+                <div className="settings-runtime__actions">
+                  <button
+                    type="button"
+                    className="action-button action-button--secondary"
+                    disabled={runtimeIsFallback || isCheckingUpdate}
+                    onClick={() => {
+                      void handleCheckForUpdates();
+                    }}
+                  >
+                    {isCheckingUpdate ? t("updaterChecking") : t("updaterCheckButton")}
+                  </button>
+                </div>
+                {updateCheckError ? (
+                  <div className="form-note form-note--danger">{updateCheckError}</div>
+                ) : null}
+                {updateCheckResult ? (
+                  <dl className="setting-list">
+                    <div className="setting-row">
+                      <dt>{t("updaterCurrentVersionLabel")}</dt>
+                      <dd>{updateCheckResult.currentVersion}</dd>
+                    </div>
+                    <div className="setting-row">
+                      <dt>{t("updaterLatestVersionLabel")}</dt>
+                      <dd>{updateCheckResult.latestVersion ?? t("updaterNoUpdateAvailable")}</dd>
+                    </div>
+                    <div className="setting-row">
+                      <dt>{t("updaterAvailabilityLabel")}</dt>
+                      <dd>{updateCheckResult.updateAvailable ? t("yes") : t("no")}</dd>
+                    </div>
+                    <div className="setting-row">
+                      <dt>{t("updaterDownloadUrlLabel")}</dt>
+                      <dd>{updateCheckResult.downloadUrl ?? t("notAvailable")}</dd>
+                    </div>
+                  </dl>
+                ) : null}
+                {releaseReadiness.warnings.length > 0 ? (
+                  <div className="subsurface-grid">
+                    {releaseReadiness.warnings.map((warning) => (
+                      <article key={warning} className="subsurface subsurface--warn">
+                        <p className="collection-card__badge">{t("releaseWarningsTitle")}</p>
+                        <h3>{t("releaseReadinessStatusWarn")}</h3>
+                        <p>{warning}</p>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="empty-state empty-state--compact">
+                    <h3>{t("noWarnings")}</h3>
+                    <p>{t("releaseNoWarnings")}</p>
                   </div>
                 )}
               </section>

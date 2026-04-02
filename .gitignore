@@ -50,3 +50,16 @@ next-env.d.ts
 jadeai-data/*
 .kilocode/*
 .omc/*
+
+# local desktop packaging artifacts
+/release-installer*/
+/desktop/.tauri/*.key
+/desktop/.tauri/*.key.pub
+/desktop/.codex-temp/
+/desktop/dev-updater/artifacts/
+/desktop/dev-updater/latest.json
+
+# local Codex artifacts
+.codex-*/
+.codex-*.log
+.codex-temp-*

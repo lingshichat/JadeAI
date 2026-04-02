@@ -2,6 +2,7 @@ import {
   getDomainContractSummary,
   getImporterDryRun,
   getLegacyImportContract,
+  getReleaseReadinessSnapshot,
   getSecretInventorySnapshot,
   getSecretVaultStatus,
   getStorageSnapshot,
@@ -17,6 +18,7 @@ import {
   type WorkspaceSettingsDocument,
   type WorkspaceSnapshot,
   type LegacyImportContract,
+  type ReleaseReadinessSnapshot,
   type SecretInventorySnapshot,
 } from "./desktop-api";
 
@@ -49,6 +51,7 @@ export interface SettingsRouteData {
   vault: SecretVaultStatus;
   secretInventory: SecretInventorySnapshot;
   domainContract: DomainContractSummary;
+  releaseReadiness: ReleaseReadinessSnapshot;
 }
 
 export interface ProviderRegistryEntry {
@@ -149,12 +152,20 @@ export async function loadImportsRouteData(): Promise<ImportsRouteData> {
 }
 
 export async function loadSettingsRouteData(): Promise<SettingsRouteData> {
-  const [workspace, settings, vault, secretInventory, domainContract] = await Promise.all([
+  const [
+    workspace,
+    settings,
+    vault,
+    secretInventory,
+    domainContract,
+    releaseReadiness,
+  ] = await Promise.all([
     getWorkspaceSnapshot(),
     getWorkspaceSettingsSnapshot(),
     getSecretVaultStatus(),
     getSecretInventorySnapshot(),
     getDomainContractSummary(),
+    getReleaseReadinessSnapshot(),
   ]);
 
   return {
@@ -163,5 +174,6 @@ export async function loadSettingsRouteData(): Promise<SettingsRouteData> {
     vault,
     secretInventory,
     domainContract,
+    releaseReadiness,
   };
 }

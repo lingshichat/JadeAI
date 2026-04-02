@@ -1,0 +1,194 @@
+import { useState, useRef, useEffect } from "react";
+import { useTranslation } from "react-i18next";
+import { GripVertical, X, Eye, EyeOff, Sparkles } from "lucide-react";
+import { useEditorStore } from "../../stores/editor-store";
+import { useResumeStore } from "../../stores/resume-store";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import type { ResumeSectionWithContent } from "../../stores/resume-store";
+import { PersonalInfoSection } from "./sections/personal-info";
+import { SummarySection } from "./sections/summary";
+import { WorkExperienceSection } from "./sections/work-experience";
+import { EducationSection } from "./sections/education";
+import { SkillsSection } from "./sections/skills";
+import { ProjectsSection } from "./sections/projects";
+import { CertificationsSection } from "./sections/certifications";
+import { LanguagesSection } from "./sections/languages";
+import { CustomSection } from "./sections/custom-section";
+import { GitHubSection } from "./sections/github";
+import { QrCodesSection } from "./sections/qr-codes";
+
+interface SectionWrapperProps {
+  section: ResumeSectionWithContent;
+  onUpdate: (content: Partial<Record<string, unknown>>) => void;
+  onRemove: () => void;
+}
+
+const sectionComponents: Record<string, React.ComponentType<{
+  section: ResumeSectionWithContent;
+  onUpdate: (content: Partial<Record<string, unknown>>) => void;
+}>> = {
+  personal_info: PersonalInfoSection,
+  summary: SummarySection,
+  work_experience: WorkExperienceSection,
+  education: EducationSection,
+  skills: SkillsSection,
+  projects: ProjectsSection,
+  certifications: CertificationsSection,
+  languages: LanguagesSection,
+  github: GitHubSection,
+  qr_codes: QrCodesSection,
+  custom: CustomSection,
+};
+
+export function SectionWrapper({ section, onUpdate, onRemove }: SectionWrapperProps) {
+  const { t } = useTranslation();
+  const { selectedSectionId, selectSection, showAiChat, toggleAiChat } = useEditorStore();
+  const { toggleSectionVisibility, updateSectionTitle } = useResumeStore();
+  const isSelected = selectedSectionId === section.id;
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState(section.title);
+  const renameInputRef = useRef<HTMLInputElement>(null);
+
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: section.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : undefined,
+  };
+
+  useEffect(() => {
+    if (isRenaming) {
+      renameInputRef.current?.focus();
+      renameInputRef.current?.select();
+    }
+  }, [isRenaming]);
+
+  const commitRename = () => {
+    const trimmed = renameValue.trim();
+    if (trimmed && trimmed !== section.title) {
+      updateSectionTitle(section.id, trimmed);
+    } else {
+      setRenameValue(section.title);
+    }
+    setIsRenaming(false);
+  };
+
+  const SectionComponent = sectionComponents[section.sectionType];
+  const isRenamable = section.sectionType !== "personal_info";
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`rounded-xl border bg-white shadow-sm transition-all duration-200 dark:bg-zinc-900 ${
+        isSelected
+          ? "border-pink-300 shadow-pink-100/50 dark:shadow-pink-900/20"
+          : "border-zinc-200 hover:border-zinc-300 dark:border-zinc-700 dark:hover:border-zinc-600"
+      } ${!section.visible ? "opacity-50" : ""}`}
+      onClick={() => selectSection(section.id)}
+    >
+      <div className="flex flex-row items-center justify-between border-b border-zinc-100 px-4 py-2.5 dark:border-zinc-800">
+        <div className="flex items-center gap-2">
+          <GripVertical
+            className="h-4 w-4 cursor-grab text-zinc-300 active:cursor-grabbing"
+            {...attributes}
+            {...listeners}
+          />
+          {isRenaming ? (
+            <input
+              ref={renameInputRef}
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onBlur={commitRename}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitRename();
+                if (e.key === "Escape") {
+                  setRenameValue(section.title);
+                  setIsRenaming(false);
+                }
+              }}
+              className="h-6 w-32 rounded border border-pink-300 bg-transparent px-1 text-sm font-semibold text-zinc-700 outline-none dark:text-zinc-200"
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : (
+            <h3
+              className={`text-sm font-semibold text-zinc-700 dark:text-zinc-200 ${
+                isRenamable
+                  ? "cursor-text rounded px-1 -mx-1 hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                  : ""
+              }`}
+              onDoubleClick={
+                isRenamable
+                  ? (e) => {
+                      e.stopPropagation();
+                      setRenameValue(section.title);
+                      setIsRenaming(true);
+                    }
+                  : undefined
+              }
+            >
+              {section.title}
+            </h3>
+          )}
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            className="flex h-7 w-7 cursor-pointer items-center justify-center rounded text-pink-400 hover:text-pink-600"
+            title={t("editor.aiPolish")}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!showAiChat) {
+                toggleAiChat();
+              }
+            }}
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            className="flex h-7 w-7 cursor-pointer items-center justify-center rounded text-zinc-400 hover:text-zinc-600"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleSectionVisibility(section.id);
+            }}
+          >
+            {section.visible ? (
+              <Eye className="h-3.5 w-3.5" />
+            ) : (
+              <EyeOff className="h-3.5 w-3.5" />
+            )}
+          </button>
+          <button
+            type="button"
+            className="flex h-7 w-7 cursor-pointer items-center justify-center rounded text-zinc-400 hover:text-red-500"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemove();
+            }}
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+      <div className="px-4 pb-4 pt-3">
+        {SectionComponent ? (
+          <SectionComponent section={section} onUpdate={onUpdate} />
+        ) : (
+          <p className="text-sm text-zinc-400">
+            {t("editorUnknownSectionType")}: {section.sectionType}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}

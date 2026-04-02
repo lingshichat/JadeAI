@@ -59,6 +59,95 @@ export interface StorageSnapshot {
   tableCounts: TableCountSnapshot[];
 }
 
+export interface DesktopDocumentListItem {
+  id: string;
+  title: string;
+  template: string;
+  language: string;
+  themeJson: string;
+  isDefault: boolean;
+  targetJobTitle?: string | null;
+  targetCompany?: string | null;
+  createdAtEpochMs: number;
+  updatedAtEpochMs: number;
+}
+
+export interface DesktopDocumentSectionItem {
+  id: string;
+  documentId: string;
+  sectionType: string;
+  title: string;
+  sortOrder: number;
+  visible: boolean;
+  contentJson: string;
+  createdAtEpochMs: number;
+  updatedAtEpochMs: number;
+}
+
+export interface DesktopDocumentDetail extends DesktopDocumentListItem {
+  sections: DesktopDocumentSectionItem[];
+}
+
+export interface CreateDocumentInput {
+  title?: string;
+  template?: string;
+  language?: string;
+  themeJson?: string;
+  targetJobTitle?: string | null;
+  targetCompany?: string | null;
+}
+
+export interface UpdateDocumentMetadataInput {
+  id: string;
+  title?: string;
+  template?: string;
+  language?: string;
+  themeJson?: string;
+  targetJobTitle?: string | null;
+  targetCompany?: string | null;
+}
+
+export interface SaveDocumentSectionInput {
+  id: string;
+  documentId: string;
+  sectionType: string;
+  title: string;
+  sortOrder: number;
+  visible: boolean;
+  content: Record<string, unknown>;
+  createdAtEpochMs?: number;
+  updatedAtEpochMs?: number;
+}
+
+export interface SaveDocumentInput {
+  id: string;
+  title: string;
+  template: string;
+  language: string;
+  themeJson: string;
+  targetJobTitle?: string | null;
+  targetCompany?: string | null;
+  sections: SaveDocumentSectionInput[];
+}
+
+export interface ImportDocumentSectionInput {
+  sectionType: string;
+  title: string;
+  sortOrder?: number;
+  visible?: boolean;
+  content: Record<string, unknown>;
+}
+
+export interface ImportDocumentInput {
+  title: string;
+  template?: string;
+  themeJson?: string;
+  language?: string;
+  targetJobTitle?: string | null;
+  targetCompany?: string | null;
+  sections: ImportDocumentSectionInput[];
+}
+
 export type WorkspaceModel = "single_workspace";
 
 export type ResumeSectionType =
@@ -251,6 +340,13 @@ export interface ProviderConfigUpdateInput {
   baseUrl: string;
   model: string;
   setAsDefault: boolean;
+}
+
+export interface WorkspaceAppearanceSettingsUpdateInput {
+  locale: string;
+  theme: string;
+  autoSave: boolean;
+  rememberWindowState: boolean;
 }
 
 export interface SecretValueWriteInput {
@@ -509,6 +605,46 @@ export interface TemplateValidationExportReceipt {
   bytesWritten: number;
 }
 
+export interface TemplateValidationExportInput extends Record<string, unknown> {
+  fileName?: string;
+  outputPath?: string;
+  html: string;
+}
+
+export type UpdaterArtifactsMode =
+  | "disabled"
+  | "current"
+  | "v1_compatible";
+
+export interface ReleaseReadinessSnapshot {
+  bundleActive: boolean;
+  updaterPluginWired: boolean;
+  updaterConfigDeclared: boolean;
+  updaterConfigured: boolean;
+  updaterArtifactsEnabled: boolean;
+  updaterArtifactsMode: UpdaterArtifactsMode;
+  updaterEndpointCount: number;
+  updaterPubkeyConfigured: boolean;
+  updaterDangerousInsecureTransport: boolean;
+  updaterUsesLocalhost: boolean;
+  updaterWindowsInstallMode?: string | null;
+  trayIconReady: boolean;
+  rememberWindowStateEnabled: boolean;
+  blockers: string[];
+  warnings: string[];
+}
+
+export interface AppUpdateCheckResult {
+  checkedAtEpochMs: number;
+  updateAvailable: boolean;
+  currentVersion: string;
+  latestVersion?: string | null;
+  target?: string | null;
+  downloadUrl?: string | null;
+  notes?: string | null;
+  pubDate?: string | null;
+}
+
 const FALLBACK_CONTEXT: BootstrapContext = {
   appName: "RoleRover Desktop",
   appVersion: "0.1.0",
@@ -536,7 +672,7 @@ const FALLBACK_WORKSPACE: WorkspaceSnapshot = {
   rootDir: "desktop/workspace",
   manifestPath: "desktop/workspace/manifests/workspace.json",
   databasePath: "desktop/workspace/rolerover.db",
-  secureSettingsPath: "desktop/workspace/secrets/vault-fallback.json",
+  secureSettingsPath: "desktop/workspace/secrets/secrets-manifest.json",
   documentsDir: "desktop/workspace/documents",
   exportsDir: "desktop/workspace/exports",
   importsDir: "desktop/workspace/imports",
@@ -1087,15 +1223,41 @@ const FALLBACK_TEMPLATE_VALIDATION_SNAPSHOT: TemplateValidationSnapshot = {
   ],
 };
 
+const FALLBACK_RELEASE_READINESS: ReleaseReadinessSnapshot = {
+  bundleActive: false,
+  updaterPluginWired: false,
+  updaterConfigDeclared: false,
+  updaterConfigured: false,
+  updaterArtifactsEnabled: false,
+  updaterArtifactsMode: "disabled",
+  updaterEndpointCount: 0,
+  updaterPubkeyConfigured: false,
+  updaterDangerousInsecureTransport: false,
+  updaterUsesLocalhost: false,
+  updaterWindowsInstallMode: null,
+  trayIconReady: false,
+  rememberWindowStateEnabled: false,
+  blockers: [
+    "Release readiness snapshot is unavailable in browser fallback mode.",
+  ],
+  warnings: [
+    "Launch the native desktop shell before treating release posture as authoritative.",
+  ],
+};
+
 function reportDesktopFallback(command: string, error: unknown): void {
   console.warn(`[desktop-api] Falling back for ${command}.`, error);
 }
 
 export const DESKTOP_AI_STREAM_EVENT = "desktop://ai-stream";
 
-async function invokeWithFallback<T>(command: string, fallback: T): Promise<T> {
+async function invokeWithFallback<T>(
+  command: string,
+  fallback: T,
+  payload?: Record<string, unknown>,
+): Promise<T> {
   try {
-    return await invoke<T>(command);
+    return payload ? await invoke<T>(command, payload) : await invoke<T>(command);
   } catch (error) {
     reportDesktopFallback(command, error);
     return fallback;
@@ -1132,6 +1294,60 @@ export async function getStorageSnapshot(): Promise<StorageSnapshot> {
   return invokeWithFallback("get_storage_snapshot", FALLBACK_STORAGE);
 }
 
+export async function listDocuments(): Promise<DesktopDocumentListItem[]> {
+  return invokeWithFallback("list_documents", []);
+}
+
+export async function getDocument(
+  documentId: string,
+): Promise<DesktopDocumentDetail | null> {
+  return invokeWithFallback("get_document", null, { documentId });
+}
+
+export async function createDocument(
+  input: CreateDocumentInput,
+): Promise<DesktopDocumentDetail> {
+  return invoke<DesktopDocumentDetail>("create_document", { input });
+}
+
+export async function updateDocumentMetadata(
+  input: UpdateDocumentMetadataInput,
+): Promise<DesktopDocumentDetail> {
+  return invoke<DesktopDocumentDetail>("update_document_metadata", { input });
+}
+
+export async function saveDocument(
+  input: SaveDocumentInput,
+): Promise<DesktopDocumentDetail> {
+  return invoke<DesktopDocumentDetail>("save_document", { input });
+}
+
+export async function deleteDocument(documentId: string): Promise<boolean> {
+  return invoke<boolean>("delete_document", { documentId });
+}
+
+export async function duplicateDocument(
+  documentId: string,
+): Promise<DesktopDocumentDetail> {
+  return invoke<DesktopDocumentDetail>("duplicate_document", { documentId });
+}
+
+export async function importDocument(
+  input: ImportDocumentInput,
+): Promise<DesktopDocumentDetail> {
+  return invoke<DesktopDocumentDetail>("import_document", { input });
+}
+
+export async function renameDocument(
+  documentId: string,
+  newTitle: string,
+): Promise<DesktopDocumentDetail> {
+  return invoke<DesktopDocumentDetail>("rename_document", {
+    documentId,
+    newTitle,
+  });
+}
+
 export async function getWorkspaceSettingsSnapshot(): Promise<WorkspaceSettingsDocument> {
   return invokeWithFallback("get_workspace_settings_snapshot", FALLBACK_SETTINGS);
 }
@@ -1145,6 +1361,17 @@ export async function getSecretInventorySnapshot(): Promise<SecretInventorySnaps
     "get_secret_inventory_snapshot",
     FALLBACK_SECRET_INVENTORY,
   );
+}
+
+export async function getReleaseReadinessSnapshot(): Promise<ReleaseReadinessSnapshot> {
+  return invokeWithFallback(
+    "get_release_readiness_snapshot",
+    FALLBACK_RELEASE_READINESS,
+  );
+}
+
+export async function checkForAppUpdate(): Promise<AppUpdateCheckResult> {
+  return invoke<AppUpdateCheckResult>("check_for_app_update");
 }
 
 export async function getImporterDryRun(): Promise<ImporterDryRunSnapshot> {
@@ -1166,10 +1393,9 @@ export async function executeImporterMigration(): Promise<ImporterDryRunSnapshot
   return invoke<ImporterDryRunSnapshot>("execute_importer_migration");
 }
 
-export async function writeTemplateValidationExport(input: {
-  fileName?: string;
-  html: string;
-}): Promise<TemplateValidationExportReceipt> {
+export async function writeTemplateValidationExport(
+  input: TemplateValidationExportInput,
+): Promise<TemplateValidationExportReceipt> {
   return invoke<TemplateValidationExportReceipt>(
     "write_template_validation_export",
     input,
@@ -1180,6 +1406,14 @@ export async function updateAiProviderSettings(
   input: ProviderConfigUpdateInput,
 ): Promise<WorkspaceSettingsDocument> {
   return invoke<WorkspaceSettingsDocument>("update_ai_provider_settings", {
+    input,
+  });
+}
+
+export async function updateWorkspaceAppearanceSettings(
+  input: WorkspaceAppearanceSettingsUpdateInput,
+): Promise<WorkspaceSettingsDocument> {
+  return invoke<WorkspaceSettingsDocument>("update_workspace_appearance_settings", {
     input,
   });
 }

@@ -1,0 +1,121 @@
+import { useTranslation } from "react-i18next";
+import { Plus, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { EditableText } from "../fields/editable-text";
+import { EditableDate } from "../fields/editable-date";
+import { EditableList } from "../fields/editable-list";
+import { FieldWrapper } from "../fields/field-wrapper";
+import { generateId } from "../../../stores/resume-store";
+import type { ResumeSectionWithContent } from "../../../stores/resume-store";
+import type { EducationContent, EducationItem } from "../../../types/resume";
+
+interface Props {
+  section: ResumeSectionWithContent;
+  onUpdate: (content: Partial<EducationContent>) => void;
+}
+
+export function EducationSection({ section, onUpdate }: Props) {
+  const { t } = useTranslation();
+  const content = section.content as Partial<EducationContent>;
+  const items: EducationItem[] = (content.items || []) as EducationItem[];
+
+  const addItem = () => {
+    const newItem: EducationItem = {
+      id: generateId(),
+      institution: "",
+      degree: "",
+      field: "",
+      location: "",
+      startDate: "",
+      endDate: "",
+      gpa: "",
+      highlights: [],
+    };
+    onUpdate({ items: [...items, newItem] });
+  };
+
+  const updateItem = (index: number, data: Partial<EducationItem>) => {
+    const updated = items.map((item: EducationItem, i: number) =>
+      i === index ? { ...item, ...data } : item
+    );
+    onUpdate({ items: updated });
+  };
+
+  const removeItem = (index: number) => {
+    onUpdate({ items: items.filter((_: EducationItem, i: number) => i !== index) });
+  };
+
+  return (
+    <div className="space-y-4">
+      {items.map((item: EducationItem, index: number) => (
+        <div key={item.id || `edu-${index}`}>
+          {index > 0 && <Separator className="mb-4" />}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-zinc-400">#{index + 1}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 cursor-pointer p-1 text-zinc-400 hover:text-red-500"
+                onClick={() => removeItem(index)}
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            <FieldWrapper>
+              <EditableText
+                label={t("editor.fields.institution")}
+                value={item.institution}
+                onChange={(v) => updateItem(index, { institution: v })}
+              />
+              <EditableText
+                label={t("editor.fields.degree")}
+                value={item.degree}
+                onChange={(v) => updateItem(index, { degree: v })}
+              />
+            </FieldWrapper>
+            <FieldWrapper>
+              <EditableText
+                label={t("editor.fields.field")}
+                value={item.field}
+                onChange={(v) => updateItem(index, { field: v })}
+              />
+              <EditableText
+                label={t("editor.fields.location")}
+                value={item.location || ""}
+                onChange={(v) => updateItem(index, { location: v })}
+              />
+            </FieldWrapper>
+            <FieldWrapper>
+              <EditableDate
+                label={t("editor.fields.startDate")}
+                value={item.startDate}
+                onChange={(v) => updateItem(index, { startDate: v })}
+              />
+              <EditableDate
+                label={t("editor.fields.endDate")}
+                value={item.endDate}
+                onChange={(v) => updateItem(index, { endDate: v })}
+              />
+            </FieldWrapper>
+            <EditableList
+              label={t("editor.fields.highlights")}
+              items={item.highlights || []}
+              onChange={(v) => updateItem(index, { highlights: v })}
+            />
+          </div>
+        </div>
+      ))}
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={addItem}
+        className="w-full cursor-pointer gap-1"
+      >
+        <Plus className="h-3.5 w-3.5" />
+        {t("editor.fields.addItem")}
+      </Button>
+    </div>
+  );
+}

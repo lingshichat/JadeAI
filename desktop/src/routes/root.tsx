@@ -1,7 +1,13 @@
 import { Link, Outlet, createRootRoute } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { i18n } from "../i18n";
-import { getBootstrapContext, isBrowserFallbackRuntime } from "../lib/desktop-api";
+import { SettingsDialog } from "../components/editor/settings-dialog";
+import {
+  getBootstrapContext,
+  getWorkspaceSettingsSnapshot,
+  isBrowserFallbackRuntime,
+} from "../lib/desktop-api";
 
 function RoleRoverLogo() {
   return (
@@ -115,6 +121,14 @@ function LanguagePicker() {
 function RootLayout() {
   const { t } = useTranslation();
   const context = rootRoute.useLoaderData();
+  const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
+  const pathname = typeof window === "undefined" ? "/" : window.location.pathname;
+  const isEditorSurface = pathname.startsWith("/editor/");
+  const isProductSurface =
+    pathname === "/dashboard"
+    || pathname === "/templates"
+    || isEditorSurface;
+  const showShellChrome = !isEditorSurface;
   const isFallback = isBrowserFallbackRuntime(context);
   const commandsLabel = context.supportsNativeCommands
     ? t("runtimeNativeCommandsReady")
@@ -122,72 +136,141 @@ function RootLayout() {
   const runtimeSummary = isFallback
     ? t("runtimeFallbackSummary")
     : t("runtimeNativeSummary");
-  const navItems = [{ to: "/imports", label: t("navImports"), exact: false }] as const;
+  const navItems = isProductSurface
+    ? ([{ to: "/templates", label: t("templatesTitle"), exact: true }] as const)
+    : ([
+        { to: "/dashboard", label: t("libraryLabel"), exact: true },
+        { to: "/templates", label: t("templatesTitle"), exact: true },
+      ] as const);
+
+  useEffect(() => {
+    const applyWorkspaceSettings = async () => {
+      try {
+        const settings = await getWorkspaceSettingsSnapshot();
+        const theme = settings.theme;
+        const resolvedTheme =
+          theme === "system"
+            ? window.matchMedia("(prefers-color-scheme: dark)").matches
+              ? "dark"
+              : "light"
+            : theme;
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.classList.toggle("dark", resolvedTheme === "dark");
+        document.documentElement.lang = settings.locale;
+        if (i18n.language !== settings.locale) {
+          await i18n.changeLanguage(settings.locale);
+        }
+      } catch (error) {
+        console.error("Failed to apply workspace settings:", error);
+      }
+    };
+
+    void applyWorkspaceSettings();
+  }, []);
 
   return (
-    <div className="app-shell">
-      <header className="shell-header">
-        <div className="shell-header__inner">
-          <div className="shell-header__left">
-            <Link className="shell-brand" to="/library" aria-label="RoleRover">
-              <RoleRoverLogo />
-            </Link>
+    <div
+      className={
+        isEditorSurface
+          ? "h-screen overflow-hidden bg-zinc-50 dark:bg-background"
+          : isProductSurface
+            ? "min-h-screen bg-zinc-50 dark:bg-background"
+            : "app-shell"
+      }
+    >
+      {showShellChrome ? (
+        <header
+          className={
+            isProductSurface
+              ? "sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:bg-background/95 dark:supports-[backdrop-filter]:bg-background/60"
+              : "shell-header"
+          }
+        >
+          <div
+            className={
+              isProductSurface
+                ? "mx-auto flex h-14 max-w-7xl items-center justify-between px-4"
+                : "shell-header__inner"
+            }
+          >
+            <div className="shell-header__left">
+              <Link className="shell-brand" to="/dashboard" aria-label="RoleRover">
+                <RoleRoverLogo />
+              </Link>
 
-            <nav className="shell-nav" aria-label={t("shellNavigationLabel")}>
-              {navItems.map((item) => (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  className="shell-nav__link"
-                  activeProps={{ className: "shell-nav__link shell-nav__link--active" }}
-                  activeOptions={{ exact: item.exact }}
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </nav>
-          </div>
+              <nav className="shell-nav" aria-label={t("shellNavigationLabel")}>
+                {navItems.map((item) => (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    className="shell-nav__link"
+                    activeProps={{ className: "shell-nav__link shell-nav__link--active" }}
+                    activeOptions={{ exact: item.exact }}
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+              </nav>
+            </div>
 
-          <div className="shell-header__actions">
-            <LanguagePicker />
-            <Link
-              className="shell-settings-link"
-              to="/settings"
-              aria-label={t("navSettings")}
-              title={t("navSettings")}
-            >
-              <SettingsIcon />
-            </Link>
+            <div className="shell-header__actions">
+              <LanguagePicker />
+              <button
+                type="button"
+                className="shell-settings-link cursor-pointer"
+                onClick={() => setSettingsDialogOpen(true)}
+                aria-label={t("navSettings")}
+                title={t("navSettings")}
+              >
+                <SettingsIcon />
+              </button>
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
+      ) : null}
 
-      <section className="shell-status">
-        <div className="shell-status__inner">
-          <div className="shell-status__copy">
-            <p className="shell-status__eyebrow">{t("runtimeBoundaryLabel")}</p>
-            <p className="shell-status__text">{runtimeSummary}</p>
+      {!isProductSurface ? (
+        <section className="shell-status">
+          <div className="shell-status__inner">
+            <div className="shell-status__copy">
+              <p className="shell-status__eyebrow">{t("runtimeBoundaryLabel")}</p>
+              <p className="shell-status__text">{runtimeSummary}</p>
+            </div>
+            <div className="shell-status__facts">
+              <span className={`status-badge status-badge--${isFallback ? "warn" : "success"}`}>
+                {t(isFallback ? "runtimeFallbackBadge" : "runtimeNativeBadge")}
+              </span>
+              <span
+                className={`status-badge status-badge--${context.supportsNativeCommands ? "success" : "warn"}`}
+              >
+                {commandsLabel}
+              </span>
+              <span className="status-badge status-badge--muted">{context.buildChannel}</span>
+            </div>
           </div>
-          <div className="shell-status__facts">
-            <span className={`status-badge status-badge--${isFallback ? "warn" : "success"}`}>
-              {t(isFallback ? "runtimeFallbackBadge" : "runtimeNativeBadge")}
-            </span>
-            <span
-              className={`status-badge status-badge--${context.supportsNativeCommands ? "success" : "warn"}`}
-            >
-              {commandsLabel}
-            </span>
-            <span className="status-badge status-badge--muted">{context.buildChannel}</span>
-          </div>
-        </div>
-        {context.limitations.length > 0 ? (
-          <p className="shell-status__note">{context.limitations[0]}</p>
-        ) : null}
-      </section>
+          {context.limitations.length > 0 ? (
+            <p className="shell-status__note">{context.limitations[0]}</p>
+          ) : null}
+        </section>
+      ) : null}
 
-      <main className="shell-main">
+      <main
+        className={
+          isEditorSurface
+            ? "h-screen overflow-hidden"
+            : isProductSurface
+              ? "mx-auto max-w-7xl px-4 py-8"
+              : "shell-main"
+        }
+      >
         <Outlet />
       </main>
+      {showShellChrome ? (
+        <SettingsDialog
+          open={settingsDialogOpen}
+          onClose={() => setSettingsDialogOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }
