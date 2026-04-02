@@ -350,6 +350,8 @@ function TemplatesRoute() {
         language: i18n.language.toLowerCase().startsWith("zh") ? "zh" : "en",
       });
       navigate({ to: "/editor/$id", params: { id: document.id } });
+    } catch (error) {
+      console.error("[templates] Failed to create document from template:", error);
     } finally {
       setCreatingTemplate(null);
     }
@@ -360,7 +362,7 @@ function TemplatesRoute() {
       {/* Header */}
       <header className="page-header">
         <div className="page-header__copy">
-        <Link to="/dashboard" className="template-back-link">
+          <Link to="/dashboard" className="template-back-link">
             <ArrowLeftIcon />
             {t("templatesBack")}
           </Link>
@@ -436,6 +438,10 @@ function TemplatesRoute() {
       {previewTemplate && (
         <div
           className="template-dialog-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t(templateLabelKeys[previewTemplate] ?? "templateClassic")}
+          tabIndex={-1}
           onClick={() => setPreviewTemplate(null)}
           onKeyDown={(e) => e.key === "Escape" && setPreviewTemplate(null)}
         >
