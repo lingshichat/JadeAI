@@ -1,4 +1,4 @@
-import { Link, Outlet, createRootRoute, useMatches } from "@tanstack/react-router";
+import { Link, Outlet, createRootRoute, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Settings } from "lucide-react";
@@ -112,8 +112,8 @@ function LanguagePicker() {
 function RootLayout() {
   const { t } = useTranslation();
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
-  const pathname = typeof window === "undefined" ? "/" : window.location.pathname;
-  const isEditorSurface = pathname.startsWith("/editor/");
+  const location = useRouterState({ select: (s) => s.location });
+  const isEditorSurface = location.pathname.startsWith("/editor/");
 
   useEffect(() => {
     const applyWorkspaceSettings = async () => {
