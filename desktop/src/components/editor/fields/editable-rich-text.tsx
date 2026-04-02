@@ -1,4 +1,3 @@
-import { useTranslation } from "react-i18next";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 

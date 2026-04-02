@@ -30,7 +30,9 @@ This contract covers the bootstrap-stage desktop shell in `desktop/`:
 - `desktop/src/lib/template-validation.ts`
 - `desktop/src/routes/root.tsx`
 - `desktop/src/routes/home.tsx`
-- `desktop/src/routes/library.tsx`
+- `desktop/src/routes/dashboard.tsx`
+- `desktop/src/routes/editor.tsx`
+- `desktop/src/routes/templates.tsx`
 - `desktop/src/routes/settings.tsx`
 - `desktop/src/i18n.ts`
 - `src/lib/constants.ts`
@@ -76,7 +78,9 @@ Desktop active surface enforced by `lint:desktop:active`:
 - `desktop/src/i18n.ts`
 - `desktop/src/routes/root.tsx`
 - `desktop/src/routes/home.tsx`
-- `desktop/src/routes/library.tsx`
+- `desktop/src/routes/dashboard.tsx`
+- `desktop/src/routes/editor.tsx`
+- `desktop/src/routes/templates.tsx`
 - `desktop/src/routes/settings.tsx`
 
 Shared active surface v1 enforced by `lint:desktop:shared`:
@@ -465,7 +469,9 @@ Pages:
 
 - `desktop/src/routes/root.tsx`
 - `desktop/src/routes/home.tsx`
-- `desktop/src/routes/library.tsx`
+- `desktop/src/routes/dashboard.tsx`
+- `desktop/src/routes/editor.tsx`
+- `desktop/src/routes/templates.tsx`
 - `desktop/src/routes/settings.tsx`
 
 Rules:
@@ -474,9 +480,9 @@ Rules:
 2. `home.tsx` must map fallback runtime to:
    - `workspaceStateFallback`
    - `migrationStateNeedsDesktop`
-3. `library.tsx` must not present fallback storage as initialized native storage.
-4. `library.tsx` template validation lane must show whether representative documents came from workspace data, native samples, or browser fallback.
-5. `library.tsx` must disable native export actions in browser fallback mode and surface saved, cancelled, and write-error outcomes explicitly instead of silently succeeding.
+3. `dashboard.tsx` must not present fallback storage as initialized native storage.
+4. `templates.tsx` template validation lane must show whether representative documents came from workspace data, native samples, or browser fallback.
+5. `templates.tsx` must disable native export actions in browser fallback mode and surface saved, cancelled, and write-error outcomes explicitly instead of silently succeeding.
 6. `settings.tsx` must not present fallback vault/settings snapshots as proof of native desktop readiness.
 7. `settings.tsx` AI controls must disable native config writes and prompt streaming in browser fallback mode.
 8. `settings.tsx` must show whether the selected provider secret is configured and must state that PR5 validates the OpenAI-compatible streaming path first.
@@ -506,8 +512,8 @@ Rules:
 
 - `pnpm dev:tauri` starts Vite on `1420`
 - `root.tsx` shows native runtime badge
-- `library.tsx` shows real SQLite version instead of `browser-fallback`
-- `library.tsx` renders representative `classic` / `modern` previews and writes HTML exports to a user-selected system path through the native save dialog
+- `dashboard.tsx` shows real SQLite version instead of `browser-fallback`
+- `templates.tsx` renders representative `classic` / `modern` previews and writes HTML exports to a user-selected system path through the native save dialog
 - Desktop window restores the last geometry (including maximized/fullscreen state) after restart and honors the `rememberWindowState` toggle.
 - Native tray icon can hide the window, restore it from the tray, and quit the desktop shell without placeholder behavior.
 - `build:desktop:updater-feed` emits a signed local `latest.json`, and settings can perform a native updater check against the local smoke feed.
@@ -542,7 +548,7 @@ Manual assertions:
 1. Run `pnpm dev:tauri`; confirm `http://127.0.0.1:1420` responds and the desktop shell opens.
 2. In the desktop shell, confirm root banner shows native runtime mode and no fallback limitations.
 3. In a browser-only renderer context, confirm root banner shows fallback mode and limitations.
-4. In the desktop shell, confirm `library.tsx` shows the template validation lane with representative `classic` / `modern` templates.
+4. In the desktop shell, confirm `templates.tsx` shows the template validation lane with representative `classic` / `modern` templates.
 5. Trigger HTML export from the native desktop shell, choose a custom system save path, and confirm the returned path matches the selected location.
 6. Trigger the same export flow and cancel the save dialog; confirm the UI reports a cancelled outcome and no file is written.
 7. Confirm browser fallback keeps the template validation lane visible but disables native export.

@@ -284,9 +284,9 @@ ${JSON.stringify(resumeContext, null, 2)}
 Job description:
 ${jdText}`,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       setState("error");
-      setErrorMessage(error.message || t("aiErrorMessage"));
+      setErrorMessage(error instanceof Error ? error.message : t("aiErrorMessage"));
     }
   };
 

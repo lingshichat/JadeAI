@@ -106,8 +106,8 @@ export function ImportJsonDialog({ open, onClose, onImport }: ImportJsonDialogPr
 
       await onImport?.(document);
       resetAndClose();
-    } catch (err: any) {
-      setError(err.message || t("importError"));
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : t("importError"));
     } finally {
       setIsImporting(false);
     }

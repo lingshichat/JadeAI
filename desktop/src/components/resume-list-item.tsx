@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { BriefcaseBusiness, Copy, Trash2, MoreVertical, Pencil } from "lucide-react";
-import { TemplateThumbnail } from "./template-thumbnail";
+import { Copy, Trash2, MoreVertical, Pencil } from "lucide-react";
 import { templateLabelsMap } from "../lib/template-labels";
 import type { Resume } from "../types/resume";
 
