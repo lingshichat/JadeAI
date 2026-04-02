@@ -366,6 +366,21 @@ def main() -> int:
     # (when this script runs inside a Claude Code session, CLAUDECODE=1 is inherited)
     env.pop("CLAUDECODE", None)
 
+    # Windows: ensure git-bash path is set for Claude Code subprocess
+    if sys.platform == "win32" and not env.get("CLAUDE_CODE_GIT_BASH_PATH"):
+        import shutil
+        # Try common git-bash locations
+        for candidate in [
+            shutil.which("bash.exe"),
+            r"C:\Program Files\Git\bin\bash.exe",
+            r"D:\Softwares\Git\usr\bin\bash.exe",
+            r"D:\Softwares\Git\bin\bash.exe",
+        ]:
+            if candidate and Path(candidate).is_file():
+                env["CLAUDE_CODE_GIT_BASH_PATH"] = str(candidate)
+                log_info(f"Set CLAUDE_CODE_GIT_BASH_PATH={candidate}")
+                break
+
     # Set non-interactive env var based on platform
     env.update(adapter.get_non_interactive_env())
 

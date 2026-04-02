@@ -30,10 +30,7 @@ copy:
 # Commands to run after creating worktree
 # Executed in worktree directory, in order, abort on failure
 post_create:
-  # Install dependencies (uncomment based on your package manager)
-  # - npm install
-  # - pnpm install --frozen-lockfile
-  # - yarn install --frozen-lockfile
+  - pnpm install --frozen-lockfile
 
 #-------------------------------------------------------------------------------
 # Check Agent Verification (Ralph Loop)
