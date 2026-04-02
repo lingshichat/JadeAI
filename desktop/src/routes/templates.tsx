@@ -1,14 +1,8 @@
 import { useState } from "react";
 import { createRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, Eye, Loader2 } from "lucide-react";
+import { ArrowLeft, Eye, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { TEMPLATES } from "@/lib/constants";
 import { ResumePreview } from "@/components/preview/resume-preview";
 import { templateLabelsMap } from "../lib/template-labels";
@@ -314,7 +308,7 @@ function TemplatesRoute() {
                 </Button>
                 <Button
                   size="sm"
-                  className="flex-1 cursor-pointer gap-1.5 bg-pink-500 hover:bg-pink-600"
+                  className="flex-1 cursor-pointer gap-1.5 bg-pink-500 text-white hover:bg-pink-600"
                   onClick={() => void handleUseTemplate(template)}
                   disabled={isCreating}
                 >
@@ -334,28 +328,35 @@ function TemplatesRoute() {
       </div>
 
       {/* Full-size preview dialog */}
-      <Dialog
-        open={!!previewTemplate}
-        onOpenChange={(open) => {
-          if (!open) setPreviewTemplate(null);
-        }}
-      >
-        <DialogContent className="flex h-[90vh] w-[90vw] flex-col gap-0 overflow-hidden p-0 sm:max-w-[900px]">
-          <DialogHeader className="shrink-0 border-b border-zinc-100 px-6 py-4 dark:border-zinc-800">
-            <DialogTitle>
-              {previewTemplate &&
-                t(templateLabelsMap[previewTemplate] || previewTemplate)}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {previewTemplate && (
+      {previewTemplate && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          onClick={() => setPreviewTemplate(null)}
+        >
+          <div
+            className="relative flex h-[90vh] w-[90vw] max-w-[900px] flex-col overflow-hidden rounded-lg bg-white shadow-xl dark:bg-zinc-900"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex shrink-0 items-center justify-between border-b border-zinc-100 px-6 py-4 dark:border-zinc-800">
+              <h2 className="text-lg font-semibold">
+                {t(templateLabelsMap[previewTemplate] || previewTemplate)}
+              </h2>
+              <button
+                type="button"
+                className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                onClick={() => setPreviewTemplate(null)}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
               <div className="mx-auto w-full max-w-[794px] p-6">
                 <ResumePreview resume={buildMockResume(previewTemplate)} />
               </div>
-            )}
+            </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
     </div>
   );
 }
