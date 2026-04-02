@@ -265,13 +265,13 @@
     "model": "默认模型",
     "modelPlaceholder": "输入模型名称...",
     "noModelsFound": "未找到模型，请在下方手动输入模型名称。",
-    "webToolsTitle": "网页工具",
-    "webToolsDescription": "为本地 AI 聊天配置 Exa Pool 网页搜索和网页访问能力。此配置仅保存在当前浏览器。",
-    "exaPoolBaseURL": "Exa Pool 地址",
-    "exaPoolBaseURLPlaceholder": "输入你的 Exa Pool / 中转站地址...",
-    "exaPoolApiKey": "Exa Pool API Key",
-    "exaPoolApiKeyPlaceholder": "输入你的 Exa Pool API Key...",
-    "exaPoolApiKeyHint": "Exa Pool 配置仅保存在本地浏览器，并通过请求头发给本地 MCP sidecar。"
+    "webToolsTitle": "网页工具 (Exa)",
+    "webToolsDescription": "为 AI 聊天配置 Exa 网页搜索能力。默认使用 Exa 官方 API，也兼容第三方中转站。",
+    "exaPoolBaseURL": "Exa Base URL",
+    "exaPoolBaseURLPlaceholder": "https://api.exa.ai（默认），或填第三方中转站地址",
+    "exaPoolApiKey": "Exa API Key",
+    "exaPoolApiKeyPlaceholder": "输入你的 Exa API Key...",
+    "exaPoolApiKeyHint": "Exa 配置仅保存在本地，用于网页搜索和内容抓取。"
   },
     "appearance": {
       "title": "外观",

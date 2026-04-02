@@ -211,11 +211,11 @@ export function AIChatBubble({ resumeId }: AIChatBubbleProps) {
     }
   }, [toggleAiChat]);
 
-  const panelTitle = translate("aiPanelTitle", "AI Assistant");
+  const panelTitle = translate("ai.panelTitle", "AI Assistant");
   const bubbleTooltip = hasApiKey
-    ? translate("aiBubbleTooltip", "Chat with AI Assistant")
+    ? translate("ai.bubbleTooltip", "Chat with AI Assistant")
     : translate(
-        "aiApiKeyMissingBubble",
+        "ai.apiKeyMissingBubble",
         "API Key not configured. Go to Settings.",
       );
 

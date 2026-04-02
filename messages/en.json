@@ -265,13 +265,13 @@
     "model": "Default Model",
     "modelPlaceholder": "Enter model name...",
     "noModelsFound": "No models found. Enter a model name manually below.",
-    "webToolsTitle": "Web Tools",
-    "webToolsDescription": "Configure Exa Pool powered web search and webpage fetching for local AI chat. This configuration stays in the current browser only.",
-    "exaPoolBaseURL": "Exa Pool Base URL",
-    "exaPoolBaseURLPlaceholder": "Enter your Exa Pool / proxy base URL...",
-    "exaPoolApiKey": "Exa Pool API Key",
-    "exaPoolApiKeyPlaceholder": "Enter your Exa Pool API Key...",
-    "exaPoolApiKeyHint": "This Exa Pool config is stored locally in the browser and sent to the local MCP sidecar via request headers."
+    "webToolsTitle": "Web Tools (Exa)",
+    "webToolsDescription": "Configure Exa web search for AI chat. Defaults to the official Exa API, also compatible with third-party proxies.",
+    "exaPoolBaseURL": "Exa Base URL",
+    "exaPoolBaseURLPlaceholder": "https://api.exa.ai (default), or a third-party proxy URL",
+    "exaPoolApiKey": "Exa API Key",
+    "exaPoolApiKeyPlaceholder": "Enter your Exa API Key...",
+    "exaPoolApiKeyHint": "Exa config is stored locally and used for web search and content fetching."
   },
     "appearance": {
       "title": "Appearance",

@@ -26,6 +26,8 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-i18next": "^15.0.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "shadcn": "^3.8.4",
     "tailwind-merge": "^3.4.0",
     "tailwindcss": "^4",

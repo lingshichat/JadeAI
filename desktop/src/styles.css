@@ -1,41 +1,43 @@
-:root {
-  color-scheme: light;
-  font-family: "Segoe UI Variable", "Inter", "Aptos", "Noto Sans SC", sans-serif;
-  background:
-    radial-gradient(circle at top right, rgba(244, 114, 182, 0.08), transparent 28%),
-    radial-gradient(circle at top left, rgba(244, 114, 182, 0.05), transparent 24%),
-    linear-gradient(180deg, #fcfcfd 0%, #fafafa 100%);
-  color: #18181b;
-}
+@layer base {
+  :root {
+    color-scheme: light;
+    font-family: "Segoe UI Variable", "Inter", "Aptos", "Noto Sans SC", sans-serif;
+    background:
+      radial-gradient(circle at top right, rgba(244, 114, 182, 0.08), transparent 28%),
+      radial-gradient(circle at top left, rgba(244, 114, 182, 0.05), transparent 24%),
+      linear-gradient(180deg, #fcfcfd 0%, #fafafa 100%);
+    color: #18181b;
+  }
 
-* {
-  box-sizing: border-box;
-}
+  * {
+    box-sizing: border-box;
+  }
 
-html,
-body,
-#root {
-  min-height: 100vh;
-}
+  html,
+  body,
+  #root {
+    min-height: 100vh;
+  }
 
-body {
-  margin: 0;
-  background: transparent;
-}
+  body {
+    margin: 0;
+    background: transparent;
+  }
 
-body,
-button,
-input,
-select {
-  font: inherit;
-}
+  body,
+  button,
+  input,
+  select {
+    font: inherit;
+  }
 
-a {
-  color: inherit;
-}
+  a {
+    color: inherit;
+  }
 
-button {
-  border: 0;
+  button {
+    border: 0;
+  }
 }
 
 .sr-only {

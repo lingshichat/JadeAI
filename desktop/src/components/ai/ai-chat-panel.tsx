@@ -10,18 +10,30 @@ import { useTranslation } from "react-i18next";
 import {
   AlertTriangle,
   Bot,
-  Clock3,
+  Clock,
   MessageSquare,
   Plus,
   SendHorizonal,
-  Settings2,
   Sparkles,
   Trash2,
   User,
   X,
 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
-import { SimpleSelect } from "../simple-select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useEditorStore } from "../../stores/editor-store";
 import { useResumeStore } from "../../stores/resume-store";
 import {
@@ -197,7 +209,7 @@ export function AIChatContent({
   resumeId,
   hideTitle = false,
 }: AIChatContentProps) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { currentResume, sections } = useResumeStore();
 
   const translate = useCallback(
@@ -208,29 +220,28 @@ export function AIChatContent({
     [t],
   );
 
-  const isZh = i18n.language.startsWith("zh");
-  const panelTitle = translate("aiPanelTitle", "AI Assistant");
+  const panelTitle = translate("ai.panelTitle", "AI Assistant");
   const defaultGreeting = translate(
-    "aiDefaultGreeting",
+    "ai.defaultGreeting",
     "Hi! I'm your resume optimization assistant. Which part of your resume would you like to improve?",
   );
   const placeholder = translate(
-    "aiPlaceholder",
+    "ai.placeholder",
     "Describe what you want to improve...",
   );
-  const thinkingLabel = translate("aiThinking", "AI is thinking...");
-  const bubbleTooltip = translate("aiBubbleTooltip", "Chat with AI Assistant");
+  const thinkingLabel = translate("ai.thinking", "AI is thinking...");
+  const bubbleTooltip = translate("ai.bubbleTooltip", "Chat with AI Assistant");
   const apiKeyMissingTitle = translate(
-    "aiApiKeyMissing",
+    "ai.apiKeyMissing",
     "API Key Not Configured",
   );
   const apiKeyMissingHint = translate(
-    "aiApiKeyMissingHint",
+    "ai.apiKeyMissingHint",
     "Please configure your AI API Key in Settings before using AI features.",
   );
-  const newChatLabel = translate("aiNewChat", "New Chat");
+  const newChatLabel = translate("ai.newChat", "New Chat");
   const genericError = translate(
-    "aiErrorMessage",
+    "ai.errorMessage",
     "Something went wrong. Please try again.",
   );
 
@@ -272,16 +283,6 @@ export function AIChatContent({
     );
   }, [runtimeSettings.model, runtimeSettings.provider, selectedModel]);
 
-  const sessionStorageHint = isZh
-    ? "当前会话只保存在这台桌面设备里，暂不与 web 历史同步。"
-    : "Sessions are stored on this desktop only and do not sync with the web history yet.";
-  const settingsHint = isZh
-    ? "要启用 AI，请在编辑器工具栏打开 Settings > AI，保存 Provider、Base URL、Model 和 API Key。"
-    : "To enable AI, open Settings > AI from the editor toolbar and save the provider, base URL, model, and API key.";
-  const desktopBoundaryHint = isZh
-    ? "当前桌面聊天已支持真实流式回复和本地会话，但直接改写简历内容仍建议通过专用对话框完成。"
-    : "Desktop chat now supports real streaming replies and local sessions, while direct resume-apply flows still belong to the dedicated dialogs.";
-  const localHistoryLabel = isZh ? "本地会话历史" : "Local session history";
 
   const refreshRuntimeSettings = useCallback(async () => {
     try {
@@ -626,133 +627,109 @@ export function AIChatContent({
   );
 
   return (
-    <div className="flex h-full flex-col bg-white">
+    <>
+      {/* Header bar */}
       <div
-        className={`relative border-b border-zinc-200 px-4 py-3 ${
-          hideTitle ? "flex justify-end" : "flex items-start justify-between"
-        }`}
+        className={`flex items-center ${
+          hideTitle ? "justify-end" : "justify-between"
+        } border-b px-4 py-3`}
       >
-        {!hideTitle ? (
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-pink-500" />
-              <h3 className="truncate text-sm font-semibold text-zinc-900">
-                {panelTitle}
-              </h3>
-            </div>
-            <div className="mt-1 flex items-center gap-2 text-[11px] text-zinc-500">
-              <span className="rounded-full bg-zinc-100 px-2 py-0.5 font-medium uppercase tracking-[0.02em] text-zinc-600">
-                {runtimeSettings.provider}
-              </span>
-              <span className="truncate">
-                {selectedModel || runtimeSettings.model}
-              </span>
-            </div>
+        {!hideTitle && (
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-pink-500" />
+            <h3 className="text-sm font-semibold text-zinc-900">
+              {panelTitle}
+            </h3>
           </div>
-        ) : null}
-
+        )}
         <div className="flex items-center gap-1">
-          <div className="relative">
-            <button
-              type="button"
-              className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
-              onClick={() => setHistoryOpen((open) => !open)}
-              title={localHistoryLabel}
-            >
-              <Clock3 className="h-4 w-4" />
-            </button>
-
-            {historyOpen ? (
-              <div className="absolute right-0 top-9 z-20 w-80 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-xl">
-                <div className="border-b border-zinc-100 px-4 py-3 text-xs font-medium text-zinc-500">
-                  {localHistoryLabel}
-                </div>
-                <div className="max-h-80 overflow-y-auto">
-                  {sessions.map((session) => {
-                    const isActive = session.id === activeSessionId;
-                    return (
-                      <div
-                        key={session.id}
-                        className={`group flex items-start gap-3 border-b border-zinc-100 px-4 py-3 transition-colors last:border-b-0 hover:bg-zinc-50 ${
-                          isActive ? "bg-pink-50/60" : ""
-                        }`}
-                      >
-                        <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-zinc-400" />
-                        <button
-                          type="button"
-                          className="min-w-0 flex-1 text-left"
-                          onClick={() => {
-                            setActiveSessionId(session.id);
-                            setHistoryOpen(false);
-                            setErrorMessage("");
-                          }}
-                        >
-                          <p className="truncate text-sm font-medium text-zinc-800">
-                            {session.title}
-                          </p>
-                          <p className="mt-1 text-[11px] text-zinc-400">
-                            {formatTime(session.updatedAt)}
-                          </p>
-                        </button>
-                        <button
-                          type="button"
-                          className="hidden rounded p-1 text-zinc-400 transition-colors hover:bg-zinc-200 hover:text-zinc-700 group-hover:block"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            deleteSession(session.id);
-                          }}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="border-t border-zinc-100 px-4 py-2 text-[11px] text-zinc-400">
-                  {sessionStorageHint}
-                </div>
+          {/* History popover */}
+          <Popover open={historyOpen} onOpenChange={setHistoryOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 cursor-pointer p-0"
+              >
+                <Clock className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-72 p-0" sideOffset={8}>
+              <div className="max-h-80 overflow-y-auto">
+                {sessions.map((session) => (
+                  <div
+                    key={session.id}
+                    className="group flex cursor-pointer items-start gap-3 border-b border-zinc-100 px-4 py-3 last:border-b-0 hover:bg-zinc-50"
+                    onClick={() => {
+                      setActiveSessionId(session.id);
+                      setHistoryOpen(false);
+                      setErrorMessage("");
+                    }}
+                  >
+                    <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-zinc-400" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-zinc-800">
+                        {session.title}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-zinc-400">
+                        {formatTime(session.updatedAt)}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="mt-0.5 hidden shrink-0 rounded p-1 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600 group-hover:block"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        deleteSession(session.id);
+                      }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+                {sessions.length === 0 && (
+                  <div className="px-4 py-6 text-center text-xs text-zinc-400">
+                    {defaultGreeting}
+                  </div>
+                )}
               </div>
-            ) : null}
-          </div>
+            </PopoverContent>
+          </Popover>
 
-          <button
-            type="button"
-            className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 cursor-pointer p-0"
             onClick={createNewSession}
             title={newChatLabel}
           >
             <Plus className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
       </div>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto bg-white px-4 py-4">
+      {/* Messages */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4">
         <div className="space-y-4">
-          {!runtimeSettings.hasApiKey ? (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+          {!runtimeSettings.hasApiKey && (
+            <div className="flex flex-col gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
               <div className="flex items-center gap-2 text-amber-700">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
-                <span className="text-sm font-semibold">
+                <span className="text-[13px] font-medium">
                   {apiKeyMissingTitle}
                 </span>
               </div>
-              <p className="mt-2 text-[13px] leading-6 text-amber-700">
+              <p className="text-[12px] leading-relaxed text-amber-600">
                 {apiKeyMissingHint}
               </p>
-              <div className="mt-3 flex items-start gap-2 rounded-xl bg-white/70 px-3 py-2 text-[12px] leading-5 text-amber-800">
-                <Settings2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                <span>{settingsHint}</span>
-              </div>
             </div>
-          ) : null}
+          )}
 
-          {activeSession && activeSession.messages.length === 0 ? (
-            <div className="rounded-2xl bg-gradient-to-br from-pink-50 to-rose-50 p-4 text-[13px] leading-6 text-pink-700">
-              <p className="font-medium">{defaultGreeting}</p>
-              <p className="mt-2 text-pink-600/90">{desktopBoundaryHint}</p>
-              <p className="mt-2 text-xs text-pink-500/90">{sessionStorageHint}</p>
+          {activeSession && activeSession.messages.length === 0 && (
+            <div className="rounded-xl bg-gradient-to-br from-pink-50 to-rose-50 p-3 text-[13px] text-pink-700">
+              {defaultGreeting}
             </div>
-          ) : null}
+          )}
 
           {activeSession?.messages.map((message) => {
             const isUser = message.role === "user";
@@ -764,7 +741,7 @@ export function AIChatContent({
                 <div
                   className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
                     isUser
-                      ? "bg-zinc-800"
+                      ? "bg-zinc-700"
                       : message.error
                         ? "bg-red-500"
                         : "bg-gradient-to-br from-pink-400 to-pink-500"
@@ -777,68 +754,76 @@ export function AIChatContent({
                   )}
                 </div>
                 <div
-                  className={`min-w-0 max-w-[calc(100%-2.5rem)] rounded-2xl px-3 py-2 text-[13px] leading-6 ${
+                  className={`min-w-0 max-w-[calc(100%-2.5rem)] rounded-2xl px-3 py-2 text-[13px] leading-relaxed ${
                     isUser
                       ? "bg-zinc-800 text-white"
                       : message.error
                         ? "border border-red-200 bg-red-50 text-red-700"
-                        : "bg-zinc-50 text-zinc-700 ring-1 ring-zinc-200/70"
+                        : "bg-zinc-50 text-zinc-700 ring-1 ring-zinc-200/60"
                   }`}
                 >
-                  <p className="whitespace-pre-wrap break-words">
-                    {message.content}
-                  </p>
+                  {isUser ? (
+                    <p className="whitespace-pre-wrap">{message.content}</p>
+                  ) : (
+                    <div className="ai-markdown">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {message.content}
+                      </ReactMarkdown>
+                    </div>
+                  )}
                 </div>
               </div>
             );
           })}
 
-          {streamingText ? (
+          {streamingText && (
             <div className="flex gap-2.5">
               <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-pink-400 to-pink-500">
                 <Bot className="h-3 w-3 text-white" />
               </div>
-              <div className="min-w-0 max-w-[calc(100%-2.5rem)] rounded-2xl bg-zinc-50 px-3 py-2 text-[13px] leading-6 text-zinc-700 ring-1 ring-zinc-200/70">
-                <p className="whitespace-pre-wrap break-words">{streamingText}</p>
-              </div>
-            </div>
-          ) : null}
-
-          {isThinking && !streamingText ? (
-            <div className="flex gap-2.5">
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-pink-400 to-pink-500">
-                <Bot className="h-3 w-3 text-white" />
-              </div>
-              <div className="rounded-2xl bg-zinc-50 px-3 py-2 text-[13px] text-zinc-600 ring-1 ring-zinc-200/70">
-                <div className="flex items-center gap-2">
-                  <span className="flex gap-1">
-                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-pink-400 [animation-delay:0ms]" />
-                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-pink-400 [animation-delay:150ms]" />
-                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-pink-400 [animation-delay:300ms]" />
-                  </span>
-                  <span>{thinkingLabel}</span>
+              <div className="min-w-0 max-w-[calc(100%-2.5rem)] rounded-2xl bg-zinc-50 px-3 py-2 text-[13px] leading-relaxed text-zinc-700 ring-1 ring-zinc-200/60">
+                <div className="ai-markdown">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {streamingText}
+                  </ReactMarkdown>
                 </div>
               </div>
             </div>
-          ) : null}
+          )}
 
-          {errorMessage ? (
-            <div className="rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] leading-5 text-red-700">
+          {isThinking && !streamingText && (
+            <div className="flex items-center gap-2 text-xs text-zinc-400">
+              <span className="flex gap-1">
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-pink-400 [animation-delay:0ms]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-pink-400 [animation-delay:150ms]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-pink-400 [animation-delay:300ms]" />
+              </span>
+              {thinkingLabel}
+            </div>
+          )}
+
+          {errorMessage && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-600">
               {errorMessage}
             </div>
-          ) : null}
+          )}
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="border-t border-zinc-200 p-3">
-        <div className="rounded-2xl border border-zinc-200 bg-zinc-50/60 transition-colors focus-within:border-zinc-300 focus-within:bg-white">
+      {/* Input */}
+      <form onSubmit={handleSubmit} className="p-3">
+        <div className="rounded-2xl border border-zinc-200 bg-zinc-50/50 transition-colors focus-within:border-zinc-300 focus-within:bg-white">
           <textarea
             value={input}
             onChange={(event) => setInput(event.target.value)}
             placeholder={placeholder}
-            rows={3}
-            disabled={isThinking || runtimeSettings.loading || !runtimeSettings.hasApiKey}
-            className="min-h-[84px] w-full resize-none bg-transparent px-4 pt-3 pb-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none disabled:cursor-not-allowed disabled:opacity-70"
+            rows={2}
+            disabled={
+              isThinking ||
+              runtimeSettings.loading ||
+              !runtimeSettings.hasApiKey
+            }
+            className="w-full resize-none bg-transparent px-4 pt-3 pb-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none disabled:cursor-not-allowed disabled:opacity-70"
             onKeyDown={(event) => {
               if (
                 event.key === "Enter" &&
@@ -851,21 +836,25 @@ export function AIChatContent({
             }}
           />
 
-          <div className="flex items-center justify-between gap-3 px-3 pb-2.5">
-            <div className="min-w-0 flex items-center gap-2">
-              <SimpleSelect
+          <div className="flex items-center justify-between px-3 pb-2.5">
+            <div>
+              <Select
                 value={selectedModel}
                 onValueChange={setSelectedModel}
-                className="h-7 max-w-[180px] rounded-full border-zinc-200 bg-white px-2.5 text-[11px] font-medium text-zinc-600 shadow-none"
                 disabled={runtimeSettings.loading || isThinking}
-                options={modelOptions.map((model) => ({
-                  value: model,
-                  label: model,
-                }))}
-              />
-              <span className="truncate text-[11px] text-zinc-400">
-                {sessionStorageHint}
-              </span>
+              >
+                <SelectTrigger className="h-7 max-w-[180px] gap-1 rounded-full border-zinc-200 bg-white px-2.5 text-[11px] font-medium text-zinc-600 shadow-none">
+                  <span className="mr-0.5 inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                  <SelectValue placeholder="Model" />
+                </SelectTrigger>
+                <SelectContent>
+                  {modelOptions.map((model) => (
+                    <SelectItem key={model} value={model} className="text-xs">
+                      {model}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <button
@@ -876,36 +865,28 @@ export function AIChatContent({
                 !runtimeSettings.hasApiKey ||
                 !input.trim()
               }
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-zinc-500 transition-colors hover:bg-zinc-300 disabled:cursor-not-allowed disabled:opacity-40 [&:not(:disabled)]:bg-pink-500 [&:not(:disabled)]:text-white [&:not(:disabled)]:hover:bg-pink-600"
-              title={bubbleTooltip}
+              className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-zinc-200 text-zinc-500 transition-colors hover:bg-zinc-300 disabled:cursor-not-allowed disabled:opacity-40 [&:not(:disabled)]:bg-pink-500 [&:not(:disabled)]:text-white [&:not(:disabled)]:hover:bg-pink-600"
             >
               <SendHorizonal className="h-4 w-4" />
             </button>
           </div>
         </div>
       </form>
-    </div>
+    </>
   );
 }
 
 export function AIChatPanel({ resumeId }: AIChatPanelProps) {
   const { toggleAiChat } = useEditorStore();
-  const { t } = useTranslation();
-
-  const closeLabel = useMemo(() => {
-    const value = t("close");
-    return value === "close" ? "Close" : value;
-  }, [t]);
 
   return (
-    <div className="relative flex w-80 shrink-0 flex-col overflow-hidden border-l border-zinc-200 bg-white">
+    <div className="relative flex w-80 shrink-0 flex-col overflow-hidden border-l bg-white">
       <AIChatContent resumeId={resumeId} />
       <Button
         variant="ghost"
         size="sm"
-        className="absolute right-2 top-2 h-7 w-7 p-0"
+        className="absolute right-1 top-1 h-7 w-7 cursor-pointer p-0"
         onClick={toggleAiChat}
-        title={closeLabel}
       >
         <X className="h-4 w-4" />
       </Button>

@@ -747,7 +747,7 @@ const FALLBACK_DOMAIN_CONTRACT: DomainContractSummary = {
         },
       ],
       exaPool: {
-        baseUrl: "",
+        baseUrl: "https://api.exa.ai",
         apiKeySecretKey: "provider.exa_pool.api_key",
       },
     },
@@ -813,7 +813,7 @@ const FALLBACK_SETTINGS: WorkspaceSettingsDocument = {
         model: "gemini-2.0-flash",
       },
     },
-    exaPoolBaseUrl: "",
+    exaPoolBaseUrl: "https://api.exa.ai",
   },
   editor: {
     autoSave: true,

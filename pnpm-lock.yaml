@@ -231,6 +231,12 @@ importers:
       react-i18next:
         specifier: ^15.0.0
         version: 15.7.4(i18next@25.10.10(typescript@5.9.3))(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(typescript@5.9.3)
+      react-markdown:
+        specifier: ^10.1.0
+        version: 10.1.0(@types/react@19.2.13)(react@19.2.3)
+      remark-gfm:
+        specifier: ^4.0.1
+        version: 4.0.1
       shadcn:
         specifier: ^3.8.4
         version: 3.8.4(@types/node@25.3.3)(typescript@5.9.3)

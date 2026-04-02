@@ -81,8 +81,8 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
   const [showApiKey, setShowApiKey] = useState(false);
   const [setAsDefault, setSetAsDefault] = useState(true);
 
-  // Exa Pool
-  const [exaPoolBaseURL, setExaPoolBaseURL] = useState("");
+  // Exa
+  const [exaPoolBaseURL, setExaPoolBaseURL] = useState("https://api.exa.ai");
   const [exaPoolApiKey, setExaPoolApiKey] = useState("");
   const [showExaPoolApiKey, setShowExaPoolApiKey] = useState(false);
 
@@ -109,8 +109,8 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
         setAIModel(config?.model || "gpt-4o");
         setSetAsDefault(true);
 
-        // Exa Pool
-        setExaPoolBaseURL(settings.ai?.exaPoolBaseUrl || "");
+        // Exa
+        setExaPoolBaseURL(settings.ai?.exaPoolBaseUrl || "https://api.exa.ai");
       } catch (error) {
         console.error("Failed to load settings:", error);
       }
@@ -214,7 +214,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
         value: exaPoolApiKey.trim(),
       });
     } catch (error) {
-      console.error("Failed to save Exa Pool API key:", error);
+      console.error("Failed to save Exa API key:", error);
     }
   }, [exaPoolApiKey]);
 
@@ -363,7 +363,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
 
             <Separator />
 
-            {/* Web Tools (Exa Pool) */}
+            {/* Web Tools (Exa) */}
             <div className="space-y-1">
               <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
                 {t("settings.ai.webToolsTitle")}
