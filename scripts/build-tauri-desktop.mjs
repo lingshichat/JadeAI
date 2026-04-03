@@ -86,15 +86,16 @@ const configuredKeyPath = firstDefined(
   env.TAURI_PRIVATE_KEY_PATH?.trim(),
   defaultKeyPath,
 );
+const shouldLoadKeyFromFile = !env.TAURI_SIGNING_PRIVATE_KEY;
 
-if (!existsSync(configuredKeyPath) && !env.TAURI_SIGNING_PRIVATE_KEY) {
+if (!existsSync(configuredKeyPath) && shouldLoadKeyFromFile) {
   console.error(
     "[build-tauri-desktop] Missing updater signing key. Provide TAURI_SIGNING_PRIVATE_KEY(_PATH) or place the private key at desktop/.tauri/updater.key.",
   );
   process.exit(1);
 }
 
-if (!env.TAURI_SIGNING_PRIVATE_KEY) {
+if (shouldLoadKeyFromFile) {
   env.TAURI_SIGNING_PRIVATE_KEY = readFileSync(configuredKeyPath, "utf8").trim();
   env.TAURI_SIGNING_PRIVATE_KEY_PATH = configuredKeyPath;
   console.log(
@@ -117,10 +118,17 @@ if (env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD) {
 
 const child = (() => {
   if (process.platform === "win32") {
-    const escapedKeyPath = configuredKeyPath.replace(/'/gu, "''");
-    const script = [
-      `$env:TAURI_SIGNING_PRIVATE_KEY_PATH='${escapedKeyPath}'`,
-      `$env:TAURI_SIGNING_PRIVATE_KEY=[System.IO.File]::ReadAllText('${escapedKeyPath}').Trim()`,
+    const scriptParts = [];
+
+    if (shouldLoadKeyFromFile) {
+      const escapedKeyPath = configuredKeyPath.replace(/'/gu, "''");
+      scriptParts.push(
+        `$env:TAURI_SIGNING_PRIVATE_KEY_PATH='${escapedKeyPath}'`,
+        `$env:TAURI_SIGNING_PRIVATE_KEY=[System.IO.File]::ReadAllText('${escapedKeyPath}').Trim()`,
+      );
+    }
+
+    scriptParts.push(
       "if ($env:TAURI_PRIVATE_KEY_PASSWORD -and -not $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD) { $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = $env:TAURI_PRIVATE_KEY_PASSWORD }",
       "$env:TAURI_PRIVATE_KEY=$env:TAURI_SIGNING_PRIVATE_KEY",
       "$env:TAURI_PRIVATE_KEY_PATH=$env:TAURI_SIGNING_PRIVATE_KEY_PATH",
@@ -129,15 +137,19 @@ const child = (() => {
       "if (-not $env:TAURI_PRIVATE_KEY_PASSWORD) { $env:TAURI_PRIVATE_KEY_PASSWORD = '' }",
       "if (-not $env:CI) { $env:CI = 'true' }",
       "& npm.cmd --prefix desktop run tauri:build",
-    ].join("; ");
+    );
+
+    const script = scriptParts.join("; ");
 
     return spawn("powershell.exe", ["-NoProfile", "-Command", script], {
       cwd: ROOT,
-      env: {
-        ...env,
-        TAURI_SIGNING_PRIVATE_KEY: undefined,
-        TAURI_PRIVATE_KEY: undefined,
-      },
+      env: shouldLoadKeyFromFile
+        ? {
+            ...env,
+            TAURI_SIGNING_PRIVATE_KEY: undefined,
+            TAURI_PRIVATE_KEY: undefined,
+          }
+        : env,
       stdio: "inherit",
     });
   }

@@ -20,6 +20,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -86,19 +89,65 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
           RELEASE_UPDATER_MANIFEST_OUTPUT: desktop/.codex-temp/release-assets/latest.json
 
-      - name: Create draft GitHub release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: ${{ github.ref_name }}
-          draft: true
-          prerelease: false
-          generate_release_notes: true
-          fail_on_unmatched_files: true
-          files: |
-            .codex-cargo-target/desktop-tauri/release/bundle/**/*.exe
-            .codex-cargo-target/desktop-tauri/release/bundle/**/*.exe.sig
-            .codex-cargo-target/desktop-tauri/release/bundle/**/*.msi
-            .codex-cargo-target/desktop-tauri/release/bundle/**/*.msi.sig
-            .codex-cargo-target/desktop-tauri/release/bundle/**/*.zip
-            .codex-cargo-target/desktop-tauri/release/bundle/**/*.zip.sig
-            desktop/.codex-temp/release-assets/latest.json
+      - name: Generate release notes
+        run: node scripts/generate-release-notes.mjs
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_NOTES_OUTPUT: desktop/.codex-temp/release-assets/RELEASE_NOTES.md
+
+      - name: Create or update draft GitHub release
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $repo = "${{ github.repository }}"
+          $notesPath = (Resolve-Path "desktop/.codex-temp/release-assets/RELEASE_NOTES.md").Path
+          $manifestPath = (Resolve-Path "desktop/.codex-temp/release-assets/latest.json").Path
+          $bundleRoot = (Resolve-Path ".codex-cargo-target/desktop-tauri/release/bundle").Path
+
+          $assets = Get-ChildItem -Path $bundleRoot -Recurse -File |
+            Where-Object { $_.Extension -in @('.exe', '.msi', '.zip', '.sig') } |
+            Select-Object -ExpandProperty FullName
+
+          $assets += $manifestPath
+
+          if ($assets.Count -eq 0) {
+            throw "No release assets were found under $bundleRoot."
+          }
+
+          & gh release view $tag --repo $repo *> $null
+          $releaseExists = $LASTEXITCODE -eq 0
+
+          if (-not $releaseExists) {
+            $createArgs = @(
+              "release", "create", $tag,
+              "--repo", $repo,
+              "--title", $tag,
+              "--draft",
+              "--notes-file", $notesPath
+            ) + $assets
+            & gh @createArgs
+            exit $LASTEXITCODE
+          }
+
+          $editArgs = @(
+            "release", "edit", $tag,
+            "--repo", $repo,
+            "--title", $tag,
+            "--draft",
+            "--notes-file", $notesPath
+          )
+          & gh @editArgs
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+          $uploadArgs = @(
+            "release", "upload", $tag,
+            "--repo", $repo,
+            "--clobber"
+          ) + $assets
+          & gh @uploadArgs
+          exit $LASTEXITCODE
