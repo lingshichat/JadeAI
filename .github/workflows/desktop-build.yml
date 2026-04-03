@@ -47,7 +47,7 @@ jobs:
       - name: Ensure updater signing key
         run: |
           if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY)) {
-            pnpm --prefix desktop exec tauri signer generate --ci -w .tauri/updater.key -f -p ""
+            pnpm --prefix desktop exec tauri signer generate --ci --write-keys .tauri/updater.key --force
           } else {
             Write-Host "Using repository TAURI_SIGNING_PRIVATE_KEY secret."
           }
