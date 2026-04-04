@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { collectReleaseNotes } from "./release-notes-shared.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -115,10 +116,11 @@ const artifactName = path.basename(preferred.artifactPath);
 const signature = fs.readFileSync(preferred.sigPath, "utf8").trim();
 const target = process.env.DESKTOP_UPDATER_TARGET?.trim() || "windows-x86_64";
 const downloadUrl = `https://github.com/${repository}/releases/download/${encodeURIComponent(releaseTag)}/${encodeURIComponent(artifactName)}`;
+const releaseNotes = collectReleaseNotes(ROOT, releaseTag, repository);
 
 const latestJson = {
   version: versionFromTag,
-  notes: `Stable desktop release ${releaseTag}.`,
+  notes: releaseNotes.body,
   pub_date: new Date().toISOString(),
   platforms: {
     [target]: {

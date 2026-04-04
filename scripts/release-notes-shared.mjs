@@ -1,0 +1,337 @@
+import { execFileSync } from "node:child_process";
+
+const SEMVER_TAG_PATTERN = /^v\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/u;
+const INTERNAL_TYPES = new Set(["docs", "chore", "ci", "build", "test", "refactor", "style"]);
+const INTERNAL_SCOPES = new Set(["docs", "readme", "trellis", "ci", "infra", "release"]);
+const GENERIC_NOISE_PATTERNS = [
+  /^(ui|bug|chat|templates|p\d+|fix|feat|update|sqlite)$/iu,
+  /^initial commit$/iu,
+];
+const INTERNAL_SUMMARY_PATTERNS = [
+  /readme/iu,
+  /vercel/iu,
+  /\bci\b/iu,
+  /workflow/iu,
+  /signing/iu,
+  /artifact/iu,
+  /smoke/iu,
+  /trellis/iu,
+  /\blint\b/iu,
+  /\bspec\b/iu,
+  /bootstrap/iu,
+  /assessment/iu,
+  /\bapi\b/iu,
+  /\bmcp\b/iu,
+  /desktop github release/iu,
+  /migration workflows/iu,
+  /runtime boundary/iu,
+  /\bpipeline\b/iu,
+  /record journal/iu,
+  /local startup helpers/iu,
+  /群二维码/u,
+  /添加部署视频/u,
+];
+const PRODUCT_REWRITE_RULES = [
+  {
+    pattern: /desktop-dashboard-parity/iu,
+    section: "New",
+    summary: "Desktop dashboard experience",
+  },
+  {
+    pattern: /desktop-templates-parity/iu,
+    section: "New",
+    summary: "Desktop templates browsing and preview",
+  },
+  {
+    pattern: /rewrite editor components to match web 1:1|editor page 1:1 parity with web/iu,
+    section: "Improved",
+    summary: "Desktop editor experience now matches the web app more closely",
+  },
+  {
+    pattern: /unify design foundation with web stack|align core surfaces with web ui/iu,
+    section: "Improved",
+    summary: "Core desktop screens now feel more consistent and polished",
+  },
+  {
+    pattern: /dynamic model fetching, connectivity tests, remove hardcoded fallbacks/iu,
+    section: "Improved",
+    summary: "AI settings now support model discovery and connectivity checks",
+  },
+  {
+    pattern: /add exa pool config to settings, rewrite 4 ai dialogs/iu,
+    section: "New",
+    summary: "Expanded AI settings and refreshed key AI dialogs",
+  },
+  {
+    pattern: /bridge native ai provider streaming in tauri/iu,
+    section: "New",
+    summary: "Native AI streaming in the desktop app",
+  },
+  {
+    pattern: /validate unified template preview and export in tauri shell/iu,
+    section: "New",
+    summary: "Template preview and export in the desktop app",
+  },
+  {
+    pattern: /fix templates preview dialog, button text color/iu,
+    section: "Improved",
+    summary: "Template preview dialog and button styling",
+  },
+  {
+    pattern: /rewrite templates page with resumepreview, fix create-dialog thumbnail overflow/iu,
+    section: "Improved",
+    summary: "Templates page layout and create-dialog thumbnails",
+  },
+  {
+    pattern: /remove shell status bar, use web template-thumbnail and tailwind nav/iu,
+    section: "Improved",
+    summary: "Desktop navigation and template thumbnails",
+  },
+];
+
+function runGit(rootDir, args) {
+  return execFileSync("git", args, {
+    cwd: rootDir,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  }).trim();
+}
+
+function getTagList(rootDir) {
+  const raw = runGit(rootDir, ["tag", "--list", "--sort=-v:refname"]);
+  return raw.length === 0
+    ? []
+    : raw.split(/\r?\n/gu).map((line) => line.trim()).filter(Boolean);
+}
+
+function getPreviousReleaseTag(rootDir, currentTag) {
+  return (
+    getTagList(rootDir).find(
+      (tag) => tag !== currentTag && SEMVER_TAG_PATTERN.test(tag),
+    ) ?? null
+  );
+}
+
+function getCommitLines(rootDir, rangeSpec) {
+  const raw = runGit(rootDir, [
+    "log",
+    "--no-merges",
+    "--format=%H%x09%s",
+    rangeSpec,
+  ]);
+  return raw.length === 0
+    ? []
+    : raw.split(/\r?\n/gu).filter(Boolean).map((line) => {
+        const [hash, ...subjectParts] = line.split("\t");
+        return {
+          hash,
+          shortHash: hash.slice(0, 7),
+          subject: subjectParts.join("\t").trim(),
+        };
+      });
+}
+
+function parseCommitSubject(subject) {
+  const normalized = subject.trim().replace(/[：﹕]/gu, ":");
+  const match =
+    /^(?<type>[A-Za-z]+)(?:\((?<scope>[^)]+)\))?!?\s*:\s*(?<summary>.+)$/u.exec(
+      normalized,
+    );
+
+  return {
+    type: match?.groups?.type?.toLowerCase() ?? "other",
+    scope: match?.groups?.scope?.toLowerCase() ?? "",
+    summary: match?.groups?.summary?.trim() ?? normalized,
+  };
+}
+
+function isInternalSummary(summary) {
+  return INTERNAL_SUMMARY_PATTERNS.some((pattern) => pattern.test(summary));
+}
+
+function isGenericNoise(summary) {
+  return GENERIC_NOISE_PATTERNS.some((pattern) => pattern.test(summary.trim()));
+}
+
+function cleanSummary(summary) {
+  const normalized = summary
+    .trim()
+    .replace(/desktop[-_]/giu, "desktop ")
+    .replace(/\b1:1\b/gu, "")
+    .replace(/\bparity\b/giu, "experience")
+    .replace(/\bin tauri shell\b/giu, "in the desktop app")
+    .replace(/\bin tauri\b/giu, "in the desktop app")
+    .replace(/\bdesktop shell\b/giu, "desktop app")
+    .replace(/\s*&\s*/gu, " and ")
+    .replace(/\s*\+\s*/gu, " and ")
+    .replace(/\s{2,}/gu, " ")
+    .replace(/\s+([,.!?:;])/gu, "$1")
+    .trim();
+
+  if (/^[a-z0-9]+(?:[-_][a-z0-9]+)+$/iu.test(normalized)) {
+    return normalized.replace(/[-_]+/gu, " ");
+  }
+
+  return normalized;
+}
+
+function toSentenceCase(summary) {
+  if (summary.length === 0) {
+    return summary;
+  }
+
+  const firstCharacter = summary[0];
+  if (/[a-z]/u.test(firstCharacter)) {
+    return `${firstCharacter.toUpperCase()}${summary.slice(1)}`;
+  }
+
+  return summary;
+}
+
+function normalizeDedupKey(summary) {
+  return summary
+    .toLocaleLowerCase("en-US")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+}
+
+function classifyCommit(commit) {
+  const parsed = parseCommitSubject(commit.subject);
+
+  for (const rule of PRODUCT_REWRITE_RULES) {
+    if (rule.pattern.test(parsed.summary)) {
+      return {
+        section: rule.section,
+        summary: rule.summary,
+      };
+    }
+  }
+
+  if (INTERNAL_TYPES.has(parsed.type) || INTERNAL_SCOPES.has(parsed.scope)) {
+    return null;
+  }
+
+  if (isInternalSummary(parsed.summary) || isGenericNoise(parsed.summary)) {
+    return null;
+  }
+
+  const section =
+    parsed.type === "feat"
+      ? "New"
+      : parsed.type === "fix" || parsed.type === "perf"
+        ? "Improved"
+        : null;
+
+  if (!section) {
+    return null;
+  }
+
+  return {
+    section,
+    summary: toSentenceCase(cleanSummary(parsed.summary)),
+  };
+}
+
+function buildSections(commits) {
+  const grouped = new Map();
+  const seen = new Set();
+
+  for (const commit of commits) {
+    const classified = classifyCommit(commit);
+    if (!classified) {
+      continue;
+    }
+
+    const dedupKey = normalizeDedupKey(classified.summary);
+    if (!dedupKey || seen.has(dedupKey)) {
+      continue;
+    }
+
+    seen.add(dedupKey);
+
+    const sectionItems = grouped.get(classified.section) ?? [];
+    sectionItems.push(classified.summary);
+    grouped.set(classified.section, sectionItems);
+  }
+
+  return [
+    { title: "New", items: grouped.get("New") ?? [] },
+    { title: "Improved", items: grouped.get("Improved") ?? [] },
+  ].filter((section) => section.items.length > 0);
+}
+
+function buildCompareLine(repository, previousTag, currentTag) {
+  if (!repository || !previousTag) {
+    return null;
+  }
+
+  return `Compared with [${previousTag}](https://github.com/${repository}/compare/${previousTag}...${currentTag}).`;
+}
+
+function buildReleaseNotesBody(sections) {
+  if (sections.length === 0) {
+    return "No user-facing additions or improvements were summarized for this release.";
+  }
+
+  const lines = [];
+  for (const section of sections) {
+    lines.push(`## ${section.title}`);
+    lines.push("");
+    for (const item of section.items) {
+      lines.push(`- ${item}`);
+    }
+    lines.push("");
+  }
+
+  return lines.join("\n").trim();
+}
+
+function buildReleaseNotesMarkdown({
+  currentTag,
+  previousTag,
+  repository,
+  releaseDate,
+  sections,
+}) {
+  const lines = [
+    `# RoleRover ${currentTag}`,
+    "",
+    `Release date: ${releaseDate}`,
+  ];
+
+  const compareLine = buildCompareLine(repository, previousTag, currentTag);
+  if (compareLine) {
+    lines.push(compareLine);
+  } else {
+    lines.push("Initial tagged desktop release for the current GitHub-based release workflow.");
+  }
+
+  lines.push("");
+  lines.push(buildReleaseNotesBody(sections));
+  lines.push("");
+
+  return lines.join("\n");
+}
+
+export function collectReleaseNotes(rootDir, currentTag, repository) {
+  const previousTag = getPreviousReleaseTag(rootDir, currentTag);
+  const rangeSpec = previousTag ? `${previousTag}..${currentTag}` : currentTag;
+  const commits = getCommitLines(rootDir, rangeSpec);
+  const sections = buildSections(commits);
+  const releaseDate = new Date().toISOString().slice(0, 10);
+
+  return {
+    previousTag,
+    commits,
+    sections,
+    releaseDate,
+    markdown: buildReleaseNotesMarkdown({
+      currentTag,
+      previousTag,
+      repository,
+      releaseDate,
+      sections,
+    }),
+    body: buildReleaseNotesBody(sections),
+  };
+}

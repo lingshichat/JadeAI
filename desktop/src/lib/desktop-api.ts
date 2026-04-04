@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 export type DesktopRuntimeMode = "tauri" | "browser_fallback";
@@ -1300,6 +1300,37 @@ async function invokeWithFallback<T>(
     reportDesktopFallback(command, error);
     return fallback;
   }
+}
+
+export async function openExternalUrl(
+  url: string,
+  app?: string | null,
+): Promise<void> {
+  const normalizedUrl = url.trim();
+  if (normalizedUrl.length === 0) {
+    throw new Error("Missing URL.");
+  }
+
+  if (isTauri()) {
+    await invoke("plugin:opener|open_url", {
+      url: normalizedUrl,
+      with: app ?? null,
+    });
+    return;
+  }
+
+  if (typeof window !== "undefined") {
+    const openedWindow = window.open(normalizedUrl, "_blank", "noopener,noreferrer");
+    if (openedWindow) {
+      openedWindow.opener = null;
+      return;
+    }
+
+    window.location.assign(normalizedUrl);
+    return;
+  }
+
+  throw new Error("Unable to open URL in the current runtime.");
 }
 
 export function isBrowserFallbackRuntime(context: BootstrapContext): boolean {

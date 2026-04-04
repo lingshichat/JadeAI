@@ -2,14 +2,12 @@ import { Link, createRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  checkForAppUpdate,
   getSecretVaultStatus,
   isBrowserFallbackRuntime,
   listenToAiStreamEvents,
   startAiPromptStream,
   updateAiProviderSettings,
   writeSecretValue,
-  type AppUpdateCheckResult,
   type DesktopAiStreamEvent,
 } from "../lib/desktop-api";
 import { loadSettingsRouteData } from "../lib/desktop-loaders";
@@ -17,6 +15,9 @@ import {
   buildProviderRuntimeReadModel,
   toSettingsSurfaceReadModel,
 } from "../lib/desktop-read-models";
+import {
+  useAppUpdateStore,
+} from "../stores/app-update-store";
 import { rootRoute } from "./root";
 
 type SettingsTab = "providers" | "experience" | "workspace";
@@ -47,8 +48,24 @@ function CloseIcon() {
   );
 }
 
+function formatUpdaterDate(value: string | null, locale: string): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat(locale.startsWith("zh") ? "zh-CN" : "en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
 function SettingsRoute() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const context = rootRoute.useLoaderData();
   const {
     workspace,
@@ -59,6 +76,7 @@ function SettingsRoute() {
     releaseReadiness,
   } = settingsRoute.useLoaderData();
   const runtimeIsFallback = isBrowserFallbackRuntime(context);
+  const canUseUpdatePreview = !runtimeIsFallback;
   const [activeTab, setActiveTab] = useState<SettingsTab>("providers");
   const [settingsState, setSettingsState] = useState(settings);
   const [vaultState, setVaultState] = useState(vault);
@@ -75,10 +93,24 @@ function SettingsRoute() {
   const [isSavingConfig, setIsSavingConfig] = useState(false);
   const [isSavingSecret, setIsSavingSecret] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
-  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
-  const [updateCheckResult, setUpdateCheckResult] = useState<AppUpdateCheckResult | null>(null);
-  const [updateCheckError, setUpdateCheckError] = useState<string | null>(null);
   const activeRequestIdRef = useRef<string | null>(null);
+  const {
+    pendingUpdate,
+    currentVersion,
+    latestVersion,
+    releaseDate,
+    downloadUrl,
+    hasChecked: hasCheckedUpdate,
+    isChecking: isCheckingUpdate,
+    isDownloading: isDownloadingUpdate,
+    isInstalling: isInstallingUpdate,
+    contentLength: updateContentLength,
+    downloadedBytes: updateDownloadedBytes,
+    error: updateError,
+    checkForUpdates,
+    downloadAndInstall,
+    openDialog: openUpdateDialog,
+  } = useAppUpdateStore();
 
   useEffect(() => {
     setSettingsState(settings);
@@ -146,6 +178,52 @@ function SettingsRoute() {
       : releaseReadiness.updaterArtifactsMode === "v1_compatible"
         ? t("updaterArtifactsModeV1Compatible")
         : t("updaterArtifactsModeDisabled");
+  const updateAvailable = Boolean(pendingUpdate);
+  const updateProgressPercent =
+    updateContentLength && updateContentLength > 0
+      ? Math.min(100, Math.round((updateDownloadedBytes / updateContentLength) * 100))
+      : null;
+  const formattedUpdateReleaseDate = formatUpdaterDate(releaseDate, i18n.language);
+  const updateStatusLabel = isInstallingUpdate
+    ? t("updaterInstalling")
+    : isDownloadingUpdate
+      ? updateProgressPercent !== null
+        ? t("updaterDownloadingProgress", { progress: updateProgressPercent })
+        : t("updaterDownloading")
+      : updateAvailable
+        ? t("updaterBadgeAvailable", {
+            version: latestVersion ?? "",
+          })
+        : hasCheckedUpdate
+          ? t("updaterNoUpdateAvailable")
+          : t("notAvailable");
+  const updateSummaryBadgeLabel = isInstallingUpdate
+    ? t("updaterInstalling")
+    : isDownloadingUpdate
+      ? updateProgressPercent !== null
+        ? t("updaterDownloadingProgress", { progress: updateProgressPercent })
+        : t("updaterDownloading")
+      : isCheckingUpdate
+        ? t("updaterChecking")
+        : updateAvailable
+          ? t("updaterBadgeAvailable", {
+              version: latestVersion ?? "",
+            })
+          : hasCheckedUpdate
+            ? t("updaterNoUpdateAvailable")
+            : t("updaterCheckButton");
+  const updateSummaryTone = updateError
+    ? "danger"
+    : updateAvailable
+      ? "success"
+      : isCheckingUpdate || isDownloadingUpdate || isInstallingUpdate
+        ? "warn"
+        : "muted";
+  const updateSummaryBody = updateAvailable
+    ? t("updaterDialogReadySummary", { version: latestVersion ?? "" })
+    : hasCheckedUpdate
+      ? t("updaterNoUpdateAvailable")
+      : t("updaterDialogBody");
 
   useEffect(() => {
     if (!providerEntries.some((entry) => entry.provider === selectedProvider) && providerEntries[0]) {
@@ -355,20 +433,19 @@ function SettingsRoute() {
   }
 
   async function handleCheckForUpdates() {
-    setIsCheckingUpdate(true);
-    setUpdateCheckError(null);
-
-    try {
-      const result = await checkForAppUpdate();
-      setUpdateCheckResult(result);
-    } catch (error) {
-      setUpdateCheckResult(null);
-      setUpdateCheckError(
-        error instanceof Error ? error.message : t("updaterCheckFailed"),
-      );
-    } finally {
-      setIsCheckingUpdate(false);
+    const foundUpdate = await checkForUpdates();
+    if (foundUpdate) {
+      openUpdateDialog();
     }
+  }
+
+  function handleOpenUpdateDialog() {
+    openUpdateDialog();
+  }
+
+  async function handleDownloadAndInstall() {
+    openUpdateDialog();
+    await downloadAndInstall();
   }
 
   return (
@@ -399,6 +476,81 @@ function SettingsRoute() {
             {vaultStatusLabel}
           </span>
         </div>
+
+        <section className="subsurface">
+          <div className="subsurface__header">
+            <div>
+              <p className="collection-card__badge">{t("updaterContractTitle")}</p>
+              <h3>{t("updaterContractHeader")}</h3>
+            </div>
+            <span className={`status-badge status-badge--${updateSummaryTone}`}>
+              {updateSummaryBadgeLabel}
+            </span>
+          </div>
+          <p>{updateSummaryBody}</p>
+          <div className="settings-runtime__actions">
+            <button
+              type="button"
+              className="action-button action-button--secondary"
+              disabled={!canUseUpdatePreview || isCheckingUpdate}
+              onClick={() => {
+                void handleCheckForUpdates();
+              }}
+            >
+              {isCheckingUpdate ? t("updaterChecking") : t("updaterCheckButton")}
+            </button>
+            {updateAvailable ? (
+              <button
+                type="button"
+                className="action-button action-button--secondary"
+                onClick={handleOpenUpdateDialog}
+              >
+                {t("updaterOpenDialogButton")}
+              </button>
+            ) : null}
+            {updateAvailable ? (
+              <button
+                type="button"
+                className="action-button"
+                disabled={!canUseUpdatePreview || isDownloadingUpdate || isInstallingUpdate}
+                onClick={() => {
+                  void handleDownloadAndInstall();
+                }}
+              >
+                {isInstallingUpdate
+                  ? t("updaterInstalling")
+                  : isDownloadingUpdate
+                    ? updateProgressPercent !== null
+                      ? t("updaterDownloadingProgress", {
+                          progress: updateProgressPercent,
+                        })
+                      : t("updaterDownloading")
+                    : t("updaterDownloadAndInstall")}
+              </button>
+            ) : null}
+          </div>
+          {updateError ? (
+            <div className="form-note form-note--danger">{updateError}</div>
+          ) : null}
+          <dl className="setting-list">
+            <div className="setting-row">
+              <dt>{t("updaterCurrentVersionLabel")}</dt>
+              <dd>{currentVersion ?? t("notAvailable")}</dd>
+            </div>
+            <div className="setting-row">
+              <dt>{t("updaterLatestVersionLabel")}</dt>
+              <dd>{latestVersion ?? t("updaterNoUpdateAvailable")}</dd>
+            </div>
+            <div className="setting-row">
+              <dt>{t("updaterStatusLabel")}</dt>
+              <dd>{updateStatusLabel}</dd>
+            </div>
+            <div className="setting-row">
+              <dt>{t("updaterReleaseDateLabel")}</dt>
+              <dd>{formattedUpdateReleaseDate ?? t("notAvailable")}</dd>
+            </div>
+          </dl>
+        </section>
 
         <div className="settings-tabs" role="tablist" aria-label={t("settingsTitle")}>
           <button
@@ -948,34 +1100,71 @@ function SettingsRoute() {
                   <button
                     type="button"
                     className="action-button action-button--secondary"
-                    disabled={runtimeIsFallback || isCheckingUpdate}
+                    disabled={!canUseUpdatePreview || isCheckingUpdate}
                     onClick={() => {
                       void handleCheckForUpdates();
                     }}
                   >
                     {isCheckingUpdate ? t("updaterChecking") : t("updaterCheckButton")}
                   </button>
+                  {updateAvailable ? (
+                    <button
+                      type="button"
+                      className="action-button action-button--secondary"
+                      onClick={handleOpenUpdateDialog}
+                    >
+                      {t("updaterOpenDialogButton")}
+                    </button>
+                  ) : null}
+                  {updateAvailable ? (
+                    <button
+                      type="button"
+                      className="action-button"
+                      disabled={!canUseUpdatePreview || isDownloadingUpdate || isInstallingUpdate}
+                      onClick={() => {
+                        void handleDownloadAndInstall();
+                      }}
+                    >
+                      {isInstallingUpdate
+                        ? t("updaterInstalling")
+                        : isDownloadingUpdate
+                          ? updateProgressPercent !== null
+                            ? t("updaterDownloadingProgress", {
+                                progress: updateProgressPercent,
+                              })
+                            : t("updaterDownloading")
+                          : t("updaterDownloadAndInstall")}
+                    </button>
+                  ) : null}
                 </div>
-                {updateCheckError ? (
-                  <div className="form-note form-note--danger">{updateCheckError}</div>
+                {updateError ? (
+                  <div className="form-note form-note--danger">{updateError}</div>
                 ) : null}
-                {updateCheckResult ? (
+                {currentVersion || hasCheckedUpdate ? (
                   <dl className="setting-list">
                     <div className="setting-row">
                       <dt>{t("updaterCurrentVersionLabel")}</dt>
-                      <dd>{updateCheckResult.currentVersion}</dd>
+                      <dd>{currentVersion ?? t("notAvailable")}</dd>
                     </div>
                     <div className="setting-row">
                       <dt>{t("updaterLatestVersionLabel")}</dt>
-                      <dd>{updateCheckResult.latestVersion ?? t("updaterNoUpdateAvailable")}</dd>
+                      <dd>{latestVersion ?? t("updaterNoUpdateAvailable")}</dd>
                     </div>
                     <div className="setting-row">
                       <dt>{t("updaterAvailabilityLabel")}</dt>
-                      <dd>{updateCheckResult.updateAvailable ? t("yes") : t("no")}</dd>
+                      <dd>{updateAvailable ? t("yes") : t("no")}</dd>
+                    </div>
+                    <div className="setting-row">
+                      <dt>{t("updaterStatusLabel")}</dt>
+                      <dd>{updateStatusLabel}</dd>
+                    </div>
+                    <div className="setting-row">
+                      <dt>{t("updaterReleaseDateLabel")}</dt>
+                      <dd>{formattedUpdateReleaseDate ?? t("notAvailable")}</dd>
                     </div>
                     <div className="setting-row">
                       <dt>{t("updaterDownloadUrlLabel")}</dt>
-                      <dd>{updateCheckResult.downloadUrl ?? t("notAvailable")}</dd>
+                      <dd>{downloadUrl ?? t("notAvailable")}</dd>
                     </div>
                   </dl>
                 ) : null}

@@ -1,6 +1,8 @@
 use crate::settings;
 use serde::Serialize;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{utils::config::Updater as BundleUpdater, AppHandle, Manager};
+use tauri_plugin_updater::UpdaterExt;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -92,11 +94,10 @@ pub fn get_release_readiness_snapshot(app: &AppHandle) -> Result<ReleaseReadines
     let updater_artifacts_enabled = updater_artifacts_mode != "disabled";
     let tray_icon_ready = false;
     let remember_window_state_enabled = settings.window.remember_window_state;
-    let updater_plugin_wired = false;
+    let updater_plugin_wired = true;
     let updater_configured = updater_endpoint_count > 0 && updater_pubkey_configured;
 
     let mut blockers = Vec::new();
-    blockers.push("Updater runtime is deferred to PR6 and is not active in this desktop parity slice.".into());
     if !app.config().bundle.active {
         blockers.push("Tauri bundling is not active in tauri.conf.json.".into());
     }
@@ -114,10 +115,6 @@ pub fn get_release_readiness_snapshot(app: &AppHandle) -> Result<ReleaseReadines
     }
 
     let mut warnings = Vec::new();
-    warnings.push(
-        "Tray integration is deferred to PR6 and is not active in this desktop parity slice."
-            .into(),
-    );
     if updater_dangerous_insecure_transport {
         warnings.push(
             "Updater config allows insecure transport so the local smoke feed can run over HTTP."
@@ -164,6 +161,40 @@ pub fn get_release_readiness_snapshot(app: &AppHandle) -> Result<ReleaseReadines
 }
 
 pub async fn check_for_app_update(app: &AppHandle) -> Result<AppUpdateCheckResult, String> {
-    let _ = app;
-    Err("Updater checks are deferred to PR6 and are unavailable in the current desktop parity slice.".into())
+    let checked_at_epoch_ms = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| format!("failed to resolve update check timestamp: {error}"))?
+        .as_millis() as u64;
+    let current_version = app.package_info().version.to_string();
+    let updater = app
+        .updater()
+        .map_err(|error| format!("failed to access updater runtime: {error}"))?;
+    let update = updater
+        .check()
+        .await
+        .map_err(|error| format!("failed to check for updates: {error}"))?;
+
+    if let Some(update) = update {
+        return Ok(AppUpdateCheckResult {
+            checked_at_epoch_ms,
+            update_available: true,
+            current_version: update.current_version,
+            latest_version: Some(update.version),
+            target: Some(update.target),
+            download_url: Some(update.download_url.to_string()),
+            notes: update.body,
+            pub_date: update.date.map(|value| value.to_string()),
+        });
+    }
+
+    Ok(AppUpdateCheckResult {
+        checked_at_epoch_ms,
+        update_available: false,
+        current_version,
+        latest_version: None,
+        target: None,
+        download_url: None,
+        notes: None,
+        pub_date: None,
+    })
 }

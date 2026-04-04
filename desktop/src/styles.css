@@ -1702,6 +1702,7 @@
   max-height: 85vh;
   overflow: hidden;
   background: white;
+  border: 1px solid rgba(228, 228, 231, 0.9);
   border-radius: 12px;
   box-shadow:
     0 20px 25px -5px rgba(0, 0, 0, 0.1),
@@ -1808,6 +1809,53 @@
   padding: 16px 20px;
   border-top: 1px solid #e4e4e7;
   background: #fafafa;
+}
+
+.dark .dialog-content {
+  background: rgba(24, 24, 27, 0.98);
+  border-color: rgba(63, 63, 70, 0.92);
+  box-shadow:
+    0 24px 60px -20px rgba(0, 0, 0, 0.6),
+    0 18px 36px -24px rgba(0, 0, 0, 0.75);
+}
+
+.dark .dialog-header {
+  border-bottom-color: #27272a;
+}
+
+.dark .dialog-title {
+  color: #f4f4f5;
+}
+
+.dark .dialog-close {
+  color: #a1a1aa;
+}
+
+.dark .dialog-close:hover {
+  color: #f4f4f5;
+  background: #27272a;
+}
+
+.dark .dialog-tabs {
+  border-bottom-color: #27272a;
+  background: #18181b;
+}
+
+.dark .dialog-tab {
+  color: #a1a1aa;
+}
+
+.dark .dialog-tab:hover {
+  color: #f4f4f5;
+}
+
+.dark .dialog-tab--active {
+  background: #09090b;
+}
+
+.dark .dialog-footer {
+  border-top-color: #27272a;
+  background: #18181b;
 }
 
 /* ========================================

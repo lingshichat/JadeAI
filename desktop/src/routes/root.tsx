@@ -1,14 +1,17 @@
 import { Link, Outlet, createRootRoute, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Settings } from "lucide-react";
+import { Download, Loader2, Settings } from "lucide-react";
 import { i18n } from "../i18n";
 import { SettingsDialog } from "../components/editor/settings-dialog";
+import { UpdateDialog } from "../components/app-update/update-dialog";
 import { Button } from "@/components/ui/button";
 import {
   getBootstrapContext,
   getWorkspaceSettingsSnapshot,
+  isBrowserFallbackRuntime,
 } from "../lib/desktop-api";
+import { useAppUpdateStore } from "../stores/app-update-store";
 
 function RoleRoverLogo() {
   return (
@@ -109,11 +112,63 @@ function LanguagePicker() {
   );
 }
 
+function AppUpdateBadge() {
+  const { t } = useTranslation();
+  const {
+    pendingUpdate,
+    latestVersion,
+    isDownloading,
+    isInstalling,
+    contentLength,
+    downloadedBytes,
+    openDialog,
+  } = useAppUpdateStore();
+
+  if (!pendingUpdate && !isDownloading && !isInstalling) {
+    return null;
+  }
+
+  const progressPercent =
+    contentLength && contentLength > 0
+      ? Math.min(100, Math.round((downloadedBytes / contentLength) * 100))
+      : null;
+  const badgeLabel = isInstalling
+    ? t("updaterBadgeInstalling")
+    : isDownloading
+      ? t("updaterBadgeDownloading", {
+          progress: progressPercent ?? "--",
+        })
+      : t("updaterBadgeAvailable", {
+          version: latestVersion ?? "",
+        });
+  const toneClassName = isDownloading || isInstalling
+    ? "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-900/60 dark:bg-sky-950/40 dark:text-sky-200 dark:hover:bg-sky-950/60"
+    : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200 dark:hover:bg-emerald-950/60";
+
+  return (
+    <button
+      type="button"
+      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors ${toneClassName}`}
+      onClick={openDialog}
+    >
+      {isDownloading || isInstalling ? (
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+      ) : (
+        <Download className="h-3.5 w-3.5" />
+      )}
+      <span>{badgeLabel}</span>
+    </button>
+  );
+}
+
 function RootLayout() {
   const { t } = useTranslation();
+  const context = rootRoute.useLoaderData();
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const location = useRouterState({ select: (s) => s.location });
   const isEditorSurface = location.pathname.startsWith("/editor/");
+  const runtimeIsFallback = isBrowserFallbackRuntime(context);
+  const performInitialCheck = useAppUpdateStore((state) => state.performInitialCheck);
 
   useEffect(() => {
     const applyWorkspaceSettings = async () => {
@@ -139,6 +194,14 @@ function RootLayout() {
 
     void applyWorkspaceSettings();
   }, []);
+
+  useEffect(() => {
+    if (runtimeIsFallback) {
+      return;
+    }
+
+    void performInitialCheck();
+  }, [performInitialCheck, runtimeIsFallback]);
 
   return (
     <div
@@ -183,6 +246,7 @@ function RootLayout() {
             </div>
 
             <div className="flex items-center gap-3">
+              <AppUpdateBadge />
               <LanguagePicker />
               <Button
                 variant="ghost"
@@ -212,6 +276,7 @@ function RootLayout() {
         open={settingsDialogOpen}
         onClose={() => setSettingsDialogOpen(false)}
       />
+      <UpdateDialog />
     </div>
   );
 }
