@@ -273,7 +273,7 @@ export function AIChatContent({ resumeId, hideTitle }: AIChatContentProps) {
         {!hideTitle && (
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-pink-500" />
-            <h3 className="text-sm font-semibold text-zinc-900">{t('panelTitle')}</h3>
+            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{t('panelTitle')}</h3>
           </div>
         )}
         <div className="flex items-center gap-1">
@@ -293,20 +293,20 @@ export function AIChatContent({ resumeId, hideTitle }: AIChatContentProps) {
                 {sessions.map((session) => (
                   <div
                     key={session.id}
-                    className="group flex cursor-pointer items-start gap-3 border-b border-zinc-100 px-4 py-3 last:border-b-0 hover:bg-zinc-50"
+                    className="group flex cursor-pointer items-start gap-3 border-b border-zinc-100 px-4 py-3 last:border-b-0 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
                     onClick={() => switchSession(session.id)}
                   >
-                    <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-zinc-400" />
+                    <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-zinc-400 dark:text-zinc-500" />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-zinc-800">
+                      <p className="truncate text-sm font-medium text-zinc-800 dark:text-zinc-100">
                         {session.title}
                       </p>
-                      <p className="mt-0.5 text-[11px] text-zinc-400">
+                      <p className="mt-0.5 text-[11px] text-zinc-400 dark:text-zinc-500">
                         {formatTime(session.updatedAt)}
                       </p>
                     </div>
                     <button
-                      className="mt-0.5 hidden shrink-0 rounded p-1 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600 group-hover:block"
+                      className="mt-0.5 hidden shrink-0 rounded p-1 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600 group-hover:block dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
                       onClick={(e) => {
                         e.stopPropagation();
                         deleteSession(session.id);
@@ -317,7 +317,7 @@ export function AIChatContent({ resumeId, hideTitle }: AIChatContentProps) {
                   </div>
                 ))}
                 {sessions.length === 0 && (
-                  <div className="px-4 py-6 text-center text-xs text-zinc-400">
+                  <div className="px-4 py-6 text-center text-xs text-zinc-400 dark:text-zinc-500">
                     {t('defaultGreeting')}
                   </div>
                 )}
@@ -342,20 +342,20 @@ export function AIChatContent({ resumeId, hideTitle }: AIChatContentProps) {
         <div className="space-y-4">
           {/* Loading more indicator */}
           {isLoadingMore && (
-            <div className="py-2 text-center text-xs text-zinc-400">
+            <div className="py-2 text-center text-xs text-zinc-400 dark:text-zinc-500">
               {t('loadingMore')}
             </div>
           )}
           {hasMore && !isLoadingMore && (
             <button
-              className="w-full py-2 text-center text-xs text-zinc-400 hover:text-zinc-600"
+              className="w-full py-2 text-center text-xs text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300"
               onClick={() => loadMore(scrollRef)}
             >
               {t('loadMore')}
             </button>
           )}
           {displayMessages.length === 0 && (
-            <div className="rounded-xl bg-gradient-to-br from-pink-50 to-rose-50 p-3 text-[13px] text-pink-700">
+            <div className="rounded-xl bg-gradient-to-br from-pink-50 to-rose-50 p-3 text-[13px] text-pink-700 dark:from-pink-950/40 dark:to-rose-950/30 dark:text-pink-100">
               {t('defaultGreeting')}
             </div>
           )}
@@ -363,7 +363,7 @@ export function AIChatContent({ resumeId, hideTitle }: AIChatContentProps) {
             <AIMessage key={renderKey} message={message} />
           ))}
           {status === 'submitted' && (
-            <div className="flex items-center gap-2 text-xs text-zinc-400">
+            <div className="flex items-center gap-2 text-xs text-zinc-400 dark:text-zinc-500">
               <span className="flex gap-1">
                 <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-pink-400 [animation-delay:0ms]" />
                 <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-pink-400 [animation-delay:150ms]" />
@@ -373,7 +373,7 @@ export function AIChatContent({ resumeId, hideTitle }: AIChatContentProps) {
             </div>
           )}
           {chatError && status !== 'streaming' && status !== 'submitted' && (
-            <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-600">
+            <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-600 dark:border-red-900/80 dark:bg-red-950/40 dark:text-red-300">
               {t('errorMessage')}
             </div>
           )}
@@ -398,7 +398,7 @@ export function AIChatPanel({ resumeId }: { resumeId: string }) {
   const { toggleAiChat } = useEditorStore();
 
   return (
-    <div className="flex w-80 shrink-0 flex-col overflow-hidden border-l bg-white">
+    <div className="flex w-80 shrink-0 flex-col overflow-hidden border-l bg-white dark:bg-zinc-950">
       <AIChatContent resumeId={resumeId} />
       {/* Close button overlaid on the header */}
       <Button

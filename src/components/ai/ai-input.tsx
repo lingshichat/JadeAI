@@ -20,14 +20,14 @@ export function AIInput({ input, onChange, onSubmit, isLoading, models, selected
 
   return (
     <form onSubmit={onSubmit} className="p-3">
-      <div className="rounded-2xl border border-zinc-200 bg-zinc-50/50 transition-colors focus-within:border-zinc-300 focus-within:bg-white">
+      <div className="rounded-2xl border border-zinc-200 bg-zinc-50/50 transition-colors focus-within:border-zinc-300 focus-within:bg-white dark:border-zinc-800 dark:bg-zinc-900/60 dark:focus-within:border-zinc-700 dark:focus-within:bg-zinc-900">
         {/* Textarea */}
         <textarea
           value={input}
           onChange={onChange}
           placeholder={t('placeholder')}
           rows={2}
-          className="w-full resize-none bg-transparent px-4 pt-3 pb-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none"
+          className="w-full resize-none bg-transparent px-4 pt-3 pb-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none dark:text-zinc-100 dark:placeholder:text-zinc-500"
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault();
@@ -42,7 +42,7 @@ export function AIInput({ input, onChange, onSubmit, isLoading, models, selected
           {/* Model selector */}
           <div>
             <Select value={selectedModel} onValueChange={onModelChange}>
-              <SelectTrigger className="h-7 max-w-[180px] gap-1 rounded-full border-zinc-200 bg-white px-2.5 text-[11px] font-medium text-zinc-600 shadow-none">
+              <SelectTrigger className="h-7 max-w-[180px] gap-1 rounded-full border-zinc-200 bg-white px-2.5 text-[11px] font-medium text-zinc-600 shadow-none dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-300">
                 <span className="mr-0.5 inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
                 <SelectValue placeholder="Model" />
               </SelectTrigger>
@@ -65,7 +65,7 @@ export function AIInput({ input, onChange, onSubmit, isLoading, models, selected
           <button
             type="submit"
             disabled={isLoading || !input.trim()}
-            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-zinc-200 text-zinc-500 transition-colors hover:bg-zinc-300 disabled:cursor-not-allowed disabled:opacity-40 [&:not(:disabled)]:bg-pink-500 [&:not(:disabled)]:text-white [&:not(:disabled)]:hover:bg-pink-600"
+            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-zinc-200 text-zinc-500 transition-colors hover:bg-zinc-300 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700 [&:not(:disabled)]:bg-pink-500 [&:not(:disabled)]:text-white [&:not(:disabled)]:hover:bg-pink-600 dark:[&:not(:disabled)]:bg-pink-500 dark:[&:not(:disabled)]:text-white dark:[&:not(:disabled)]:hover:bg-pink-600"
           >
             <SendHorizonal className="h-4 w-4" />
           </button>

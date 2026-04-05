@@ -37,10 +37,10 @@ function CollapsibleBlock({
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <div className="overflow-hidden rounded-md border border-zinc-200 bg-zinc-50">
+    <div className="overflow-hidden rounded-md border border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/70">
       <button
         type="button"
-        className="flex w-full cursor-pointer items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-medium text-zinc-500 hover:bg-zinc-100"
+        className="flex w-full cursor-pointer items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-medium text-zinc-500 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
         onClick={() => setOpen(!open)}
       >
         {open ? (
@@ -53,8 +53,8 @@ function CollapsibleBlock({
         {statusIcon && <span className="ml-auto">{statusIcon}</span>}
       </button>
       {open && (
-        <div className="border-t border-zinc-200 bg-zinc-900 px-3 py-2">
-          <pre className="overflow-x-auto whitespace-pre-wrap break-all font-mono text-[11px] leading-relaxed text-zinc-300">
+        <div className="border-t border-zinc-200 bg-zinc-900 px-3 py-2 dark:border-zinc-800 dark:bg-zinc-950">
+          <pre className="overflow-x-auto whitespace-pre-wrap break-all font-mono text-[11px] leading-relaxed text-zinc-300 dark:text-zinc-200">
             {content}
           </pre>
         </div>
@@ -168,7 +168,7 @@ export function AIMessage({ message }: AIMessageProps) {
         className={`min-w-0 max-w-[calc(100%-2.5rem)] rounded-2xl px-3 py-2 text-[13px] leading-relaxed ${
           isUser
             ? 'bg-zinc-800 text-white'
-            : 'bg-zinc-50 text-zinc-700 ring-1 ring-zinc-200/60'
+            : 'bg-zinc-50 text-zinc-700 ring-1 ring-zinc-200/60 dark:bg-zinc-900 dark:text-zinc-200 dark:ring-zinc-800/80'
         }`}
       >
         {isUser ? (

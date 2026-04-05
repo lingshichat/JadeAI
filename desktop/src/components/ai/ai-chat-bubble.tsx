@@ -236,7 +236,7 @@ export function AIChatBubble({ resumeId }: AIChatBubbleProps) {
   return (
     <>
       <div
-        className="fixed z-50 flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl transition-opacity duration-200"
+        className="fixed z-50 flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl transition-opacity duration-200 dark:border-zinc-800 dark:bg-zinc-950"
         style={{
           width: WINDOW_WIDTH,
           height: WINDOW_HEIGHT,

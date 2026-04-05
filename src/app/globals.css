@@ -222,7 +222,7 @@
 
 /* AI chat markdown */
 .ai-markdown {
-  @apply text-[13px] leading-relaxed;
+  @apply text-[13px] leading-relaxed text-zinc-700 dark:text-zinc-200;
 }
 .ai-markdown p {
   @apply mb-2 last:mb-0;
@@ -273,5 +273,5 @@
   @apply border border-zinc-200 bg-zinc-100 px-2 py-1 text-left font-semibold text-zinc-800 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200;
 }
 .ai-markdown td {
-  @apply border border-zinc-200 px-2 py-1 text-zinc-600 dark:border-zinc-700 dark:text-zinc-400;
+  @apply border border-zinc-200 px-2 py-1 text-zinc-600 dark:border-zinc-700 dark:text-zinc-300;
 }

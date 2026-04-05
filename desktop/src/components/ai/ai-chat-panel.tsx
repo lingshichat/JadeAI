@@ -838,7 +838,7 @@ export function AIChatContent({
         {!hideTitle && (
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-pink-500" />
-            <h3 className="text-sm font-semibold text-zinc-900">
+            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
               {panelTitle}
             </h3>
           </div>
@@ -860,25 +860,25 @@ export function AIChatContent({
                 {sessions.map((session) => (
                   <div
                     key={session.id}
-                    className="group flex cursor-pointer items-start gap-3 border-b border-zinc-100 px-4 py-3 last:border-b-0 hover:bg-zinc-50"
+                    className="group flex cursor-pointer items-start gap-3 border-b border-zinc-100 px-4 py-3 last:border-b-0 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
                     onClick={() => {
                       setActiveSessionId(session.id);
                       setHistoryOpen(false);
                       setErrorMessage("");
                     }}
                   >
-                    <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-zinc-400" />
+                    <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-zinc-400 dark:text-zinc-500" />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-zinc-800">
+                      <p className="truncate text-sm font-medium text-zinc-800 dark:text-zinc-100">
                         {session.title}
                       </p>
-                      <p className="mt-0.5 text-[11px] text-zinc-400">
+                      <p className="mt-0.5 text-[11px] text-zinc-400 dark:text-zinc-500">
                         {formatTime(session.updatedAt)}
                       </p>
                     </div>
                     <button
                       type="button"
-                      className="mt-0.5 hidden shrink-0 rounded p-1 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600 group-hover:block"
+                      className="mt-0.5 hidden shrink-0 rounded p-1 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600 group-hover:block dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
                       onClick={(event) => {
                         event.stopPropagation();
                         deleteSession(session.id);
@@ -889,7 +889,7 @@ export function AIChatContent({
                   </div>
                 ))}
                 {sessions.length === 0 && (
-                  <div className="px-4 py-6 text-center text-xs text-zinc-400">
+                  <div className="px-4 py-6 text-center text-xs text-zinc-400 dark:text-zinc-500">
                     {defaultGreeting}
                   </div>
                 )}
@@ -913,21 +913,21 @@ export function AIChatContent({
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4">
         <div className="space-y-4">
           {!runtimeSettings.hasApiKey && (
-            <div className="flex flex-col gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
-              <div className="flex items-center gap-2 text-amber-700">
+            <div className="flex flex-col gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/60 dark:bg-amber-950/30">
+              <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
                 <span className="text-[13px] font-medium">
                   {apiKeyMissingTitle}
                 </span>
               </div>
-              <p className="text-[12px] leading-relaxed text-amber-600">
+              <p className="text-[12px] leading-relaxed text-amber-600 dark:text-amber-400/90">
                 {apiKeyMissingHint}
               </p>
             </div>
           )}
 
           {activeSession && activeSession.messages.length === 0 && (
-            <div className="rounded-xl bg-gradient-to-br from-pink-50 to-rose-50 p-3 text-[13px] text-pink-700">
+            <div className="rounded-xl bg-gradient-to-br from-pink-50 to-rose-50 p-3 text-[13px] text-pink-700 dark:from-pink-950/40 dark:to-rose-950/30 dark:text-pink-100">
               {defaultGreeting}
             </div>
           )}
@@ -962,8 +962,8 @@ export function AIChatContent({
                     isUser
                       ? "bg-zinc-800 text-white"
                       : message.error
-                        ? "border border-red-200 bg-red-50 text-red-700"
-                        : "bg-zinc-50 text-zinc-700 ring-1 ring-zinc-200/60"
+                        ? "border border-red-200 bg-red-50 text-red-700 dark:border-red-900/80 dark:bg-red-950/40 dark:text-red-300"
+                        : "bg-zinc-50 text-zinc-700 ring-1 ring-zinc-200/60 dark:bg-zinc-900 dark:text-zinc-200 dark:ring-zinc-800/80"
                   }`}
                 >
                   {isUser ? (
@@ -1008,7 +1008,7 @@ export function AIChatContent({
               <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-pink-400 to-pink-500">
                 <Bot className="h-3 w-3 text-white" />
               </div>
-              <div className="min-w-0 max-w-[calc(100%-2.5rem)] rounded-2xl bg-zinc-50 px-3 py-2 text-[13px] leading-relaxed text-zinc-700 ring-1 ring-zinc-200/60">
+              <div className="min-w-0 max-w-[calc(100%-2.5rem)] rounded-2xl bg-zinc-50 px-3 py-2 text-[13px] leading-relaxed text-zinc-700 ring-1 ring-zinc-200/60 dark:bg-zinc-900 dark:text-zinc-200 dark:ring-zinc-800/80">
                 <div className="space-y-2">
                   {streamingToolCalls.map((toolCall) => (
                     <ToolExecutionCard
@@ -1042,7 +1042,7 @@ export function AIChatContent({
           )}
 
           {isThinking && !streamingText && streamingToolCalls.length === 0 && (
-            <div className="flex items-center gap-2 text-xs text-zinc-400">
+            <div className="flex items-center gap-2 text-xs text-zinc-400 dark:text-zinc-500">
               <span className="flex gap-1">
                 <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-pink-400 [animation-delay:0ms]" />
                 <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-pink-400 [animation-delay:150ms]" />
@@ -1053,7 +1053,7 @@ export function AIChatContent({
           )}
 
           {errorMessage && (
-            <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-600">
+            <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-600 dark:border-red-900/80 dark:bg-red-950/40 dark:text-red-300">
               {errorMessage}
             </div>
           )}
@@ -1062,7 +1062,7 @@ export function AIChatContent({
 
       {/* Input */}
       <form onSubmit={handleSubmit} className="p-3">
-        <div className="rounded-2xl border border-zinc-200 bg-zinc-50/50 transition-colors focus-within:border-zinc-300 focus-within:bg-white">
+        <div className="rounded-2xl border border-zinc-200 bg-zinc-50/50 transition-colors focus-within:border-zinc-300 focus-within:bg-white dark:border-zinc-800 dark:bg-zinc-900/60 dark:focus-within:border-zinc-700 dark:focus-within:bg-zinc-900">
           <textarea
             value={input}
             onChange={(event) => setInput(event.target.value)}
@@ -1073,7 +1073,7 @@ export function AIChatContent({
               runtimeSettings.loading ||
               !runtimeSettings.hasApiKey
             }
-            className="w-full resize-none bg-transparent px-4 pt-3 pb-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none disabled:cursor-not-allowed disabled:opacity-70"
+            className="w-full resize-none bg-transparent px-4 pt-3 pb-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none disabled:cursor-not-allowed disabled:opacity-70 dark:text-zinc-100 dark:placeholder:text-zinc-500"
             onKeyDown={(event) => {
               if (
                 event.key === "Enter" &&
@@ -1093,7 +1093,7 @@ export function AIChatContent({
                 onValueChange={setSelectedModel}
                 disabled={runtimeSettings.loading || isThinking}
               >
-                <SelectTrigger className="h-7 max-w-[180px] gap-1 rounded-full border-zinc-200 bg-white px-2.5 text-[11px] font-medium text-zinc-600 shadow-none">
+                <SelectTrigger className="h-7 max-w-[180px] gap-1 rounded-full border-zinc-200 bg-white px-2.5 text-[11px] font-medium text-zinc-600 shadow-none dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-300">
                   <span className="mr-0.5 inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
                   <SelectValue placeholder="Model" />
                 </SelectTrigger>
@@ -1115,7 +1115,7 @@ export function AIChatContent({
                 !runtimeSettings.hasApiKey ||
                 !input.trim()
               }
-              className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-zinc-200 text-zinc-500 transition-colors hover:bg-zinc-300 disabled:cursor-not-allowed disabled:opacity-40 [&:not(:disabled)]:bg-pink-500 [&:not(:disabled)]:text-white [&:not(:disabled)]:hover:bg-pink-600"
+              className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-zinc-200 text-zinc-500 transition-colors hover:bg-zinc-300 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700 [&:not(:disabled)]:bg-pink-500 [&:not(:disabled)]:text-white [&:not(:disabled)]:hover:bg-pink-600 dark:[&:not(:disabled)]:bg-pink-500 dark:[&:not(:disabled)]:text-white dark:[&:not(:disabled)]:hover:bg-pink-600"
             >
               <SendHorizonal className="h-4 w-4" />
             </button>
@@ -1130,7 +1130,7 @@ export function AIChatPanel({ resumeId }: AIChatPanelProps) {
   const { toggleAiChat } = useEditorStore();
 
   return (
-    <div className="relative flex w-80 shrink-0 flex-col overflow-hidden border-l bg-white">
+    <div className="relative flex w-80 shrink-0 flex-col overflow-hidden border-l bg-white dark:border-zinc-800 dark:bg-zinc-950">
       <AIChatContent key={resumeId} resumeId={resumeId} />
       <Button
         variant="ghost"

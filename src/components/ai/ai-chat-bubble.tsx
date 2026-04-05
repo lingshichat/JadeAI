@@ -147,7 +147,7 @@ export function AIChatBubble({ resumeId }: AIChatBubbleProps) {
     <>
       {/* Floating chat window — always mounted to preserve state, toggled via CSS */}
       <div
-        className="fixed z-50 flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl transition-opacity duration-200"
+        className="fixed z-50 flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl transition-opacity duration-200 dark:border-zinc-800 dark:bg-zinc-950"
         style={{
           width: WIN_W,
           height: WIN_H,
