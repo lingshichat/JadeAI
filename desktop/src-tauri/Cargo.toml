@@ -1,6 +1,6 @@
 [package]
 name = "rolerover-desktop"
-version = "1.0.0"
+version = "1.1.0"
 description = "Tauri bootstrap shell for the RoleRover desktop rewrite"
 authors = ["RoleRover"]
 edition = "2021"
