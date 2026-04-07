@@ -232,6 +232,16 @@ function RootLayout() {
                   {t("libraryLabel")}
                 </Link>
                 <Link
+                  to="/interview"
+                  className="rounded-md px-3 py-1.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                  activeProps={{
+                    className:
+                      "rounded-md px-3 py-1.5 text-sm font-medium bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100",
+                  }}
+                >
+                  {t("interview.navLabel")}
+                </Link>
+                <Link
                   to="/templates"
                   className="rounded-md px-3 py-1.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
                   activeProps={{

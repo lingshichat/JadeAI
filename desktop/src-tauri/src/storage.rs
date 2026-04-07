@@ -11,7 +11,7 @@ use std::{
 use tauri::{AppHandle, Manager};
 use uuid::Uuid;
 
-const STORAGE_SCHEMA_VERSION: u32 = 1;
+const STORAGE_SCHEMA_VERSION: u32 = 2;
 const WORKSPACE_ROOT_DIR: &str = "workspace";
 const DATABASE_FILE: &str = "rolerover.db";
 const DEFAULT_WINDOW_WIDTH: i64 = 1480;
@@ -443,6 +443,23 @@ fn resolve_storage_paths(app: &AppHandle) -> Result<StoragePaths, String> {
         workspace_root,
         database_path,
     })
+}
+
+fn open_initialized_connection(app: &AppHandle) -> Result<Connection, String> {
+    let paths = resolve_storage_paths(app)?;
+    ensure_storage_directory(&paths.workspace_root)?;
+    let app_version = app.package_info().version.to_string();
+
+    let connection = Connection::open(&paths.database_path).map_err(|error| {
+        format!(
+            "failed to open sqlite database {}: {error}",
+            paths.database_path.display()
+        )
+    })?;
+    configure_connection(&connection)?;
+    bootstrap_schema(&connection)?;
+    seed_workspace_defaults(&connection, &app_version)?;
+    Ok(connection)
 }
 
 fn load_workspace_template_documents(
@@ -1022,6 +1039,57 @@ fn bootstrap_schema(connection: &Connection) -> Result<(), String> {
               FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE CASCADE
             );
 
+            CREATE TABLE IF NOT EXISTS interview_sessions (
+              id TEXT PRIMARY KEY,
+              resume_id TEXT,
+              job_description TEXT NOT NULL,
+              job_title TEXT NOT NULL DEFAULT '',
+              selected_interviewers_json TEXT NOT NULL DEFAULT '[]',
+              current_round INTEGER NOT NULL DEFAULT 0,
+              status TEXT NOT NULL DEFAULT 'preparing',
+              created_at_epoch_ms INTEGER NOT NULL,
+              updated_at_epoch_ms INTEGER NOT NULL,
+              FOREIGN KEY(resume_id) REFERENCES documents(id) ON DELETE SET NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS interview_rounds (
+              id TEXT PRIMARY KEY,
+              session_id TEXT NOT NULL,
+              interviewer_type TEXT NOT NULL,
+              interviewer_config_json TEXT NOT NULL,
+              sort_order INTEGER NOT NULL DEFAULT 0,
+              status TEXT NOT NULL DEFAULT 'pending',
+              question_count INTEGER NOT NULL DEFAULT 0,
+              max_questions INTEGER NOT NULL DEFAULT 10,
+              summary_json TEXT,
+              created_at_epoch_ms INTEGER NOT NULL,
+              updated_at_epoch_ms INTEGER NOT NULL,
+              FOREIGN KEY(session_id) REFERENCES interview_sessions(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS interview_messages (
+              id TEXT PRIMARY KEY,
+              round_id TEXT NOT NULL,
+              role TEXT NOT NULL,
+              content TEXT NOT NULL,
+              metadata_json TEXT NOT NULL DEFAULT '{}',
+              created_at_epoch_ms INTEGER NOT NULL,
+              updated_at_epoch_ms INTEGER NOT NULL,
+              FOREIGN KEY(round_id) REFERENCES interview_rounds(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS interview_reports (
+              id TEXT PRIMARY KEY,
+              session_id TEXT NOT NULL UNIQUE,
+              overall_score INTEGER NOT NULL,
+              summary TEXT NOT NULL,
+              overall_feedback TEXT NOT NULL,
+              improvement_suggestions_json TEXT NOT NULL DEFAULT '[]',
+              created_at_epoch_ms INTEGER NOT NULL,
+              updated_at_epoch_ms INTEGER NOT NULL,
+              FOREIGN KEY(session_id) REFERENCES interview_sessions(id) ON DELETE CASCADE
+            );
+
             CREATE TABLE IF NOT EXISTS migration_audit (
               id TEXT PRIMARY KEY,
               run_id TEXT NOT NULL,
@@ -1034,6 +1102,13 @@ fn bootstrap_schema(connection: &Connection) -> Result<(), String> {
               details_json TEXT NOT NULL DEFAULT '{}',
               created_at_epoch_ms INTEGER NOT NULL
             );
+
+            CREATE INDEX IF NOT EXISTS idx_interview_rounds_session_sort
+              ON interview_rounds(session_id, sort_order);
+            CREATE INDEX IF NOT EXISTS idx_interview_messages_round_created
+              ON interview_messages(round_id, created_at_epoch_ms);
+            CREATE INDEX IF NOT EXISTS idx_interview_reports_session
+              ON interview_reports(session_id);
             "#,
         )
         .map_err(|error| format!("failed to bootstrap storage schema: {error}"))
@@ -1105,6 +1180,10 @@ fn collect_table_counts(connection: &Connection) -> Result<Vec<TableCountSnapsho
         "ai_chat_sessions",
         "ai_chat_messages",
         "ai_analysis_records",
+        "interview_sessions",
+        "interview_rounds",
+        "interview_messages",
+        "interview_reports",
         "migration_audit",
     ];
 
@@ -1132,6 +1211,965 @@ fn now_epoch_ms() -> Result<u64, String> {
 
 fn path_to_string(path: &Path) -> String {
     path.to_string_lossy().replace('\\', "/")
+}
+
+// =====================================================
+// Interview native storage models
+// =====================================================
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InterviewSessionListItem {
+    pub id: String,
+    pub resume_id: Option<String>,
+    pub job_description: String,
+    pub job_title: Option<String>,
+    pub selected_interviewers: Vec<Value>,
+    pub current_round: i32,
+    pub total_rounds: i32,
+    pub status: String,
+    pub has_report: bool,
+    pub overall_score: Option<i32>,
+    pub created_at_epoch_ms: i64,
+    pub updated_at_epoch_ms: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InterviewSessionDetail {
+    pub id: String,
+    pub resume_id: Option<String>,
+    pub job_description: String,
+    pub job_title: Option<String>,
+    pub selected_interviewers: Vec<Value>,
+    pub current_round: i32,
+    pub total_rounds: i32,
+    pub status: String,
+    pub created_at_epoch_ms: i64,
+    pub updated_at_epoch_ms: i64,
+    pub rounds: Vec<InterviewRoundDetail>,
+    pub report: Option<InterviewReportRecord>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InterviewRoundDetail {
+    pub id: String,
+    pub session_id: String,
+    pub interviewer_type: String,
+    pub interviewer_config: Value,
+    pub sort_order: i32,
+    pub status: String,
+    pub question_count: i32,
+    pub max_questions: i32,
+    pub summary: Option<Value>,
+    pub created_at_epoch_ms: i64,
+    pub updated_at_epoch_ms: i64,
+    pub messages: Vec<InterviewMessageItem>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InterviewMessageItem {
+    pub id: String,
+    pub round_id: String,
+    pub role: String,
+    pub content: String,
+    pub metadata: Value,
+    pub created_at_epoch_ms: i64,
+    pub updated_at_epoch_ms: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InterviewReportRecord {
+    pub id: String,
+    pub session_id: String,
+    pub overall_score: i32,
+    pub summary: String,
+    pub overall_feedback: String,
+    pub improvement_suggestions: Vec<String>,
+    pub created_at_epoch_ms: i64,
+    pub updated_at_epoch_ms: i64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateInterviewRoundInput {
+    pub interviewer_type: String,
+    pub interviewer_config: Value,
+    pub max_questions: Option<i32>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateInterviewSessionInput {
+    pub resume_id: Option<String>,
+    pub job_description: String,
+    pub job_title: Option<String>,
+    pub rounds: Vec<CreateInterviewRoundInput>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateInterviewMessageMetadataInput {
+    pub message_id: String,
+    pub metadata: Value,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AddInterviewMessageInput {
+    pub round_id: String,
+    pub role: String,
+    pub content: String,
+    pub metadata: Option<Value>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveInterviewReportInput {
+    pub session_id: String,
+    pub overall_score: i32,
+    pub summary: String,
+    pub overall_feedback: String,
+    pub improvement_suggestions: Vec<String>,
+}
+
+pub fn list_interview_sessions(app: &AppHandle) -> Result<Vec<InterviewSessionListItem>, String> {
+    let connection = open_initialized_connection(app)?;
+    let mut statement = connection
+        .prepare(
+            r#"
+            SELECT
+              sessions.id,
+              sessions.resume_id,
+              sessions.job_description,
+              sessions.job_title,
+              sessions.selected_interviewers_json,
+              sessions.current_round,
+              sessions.status,
+              COALESCE(round_counts.total_rounds, 0),
+              reports.id,
+              reports.overall_score,
+              sessions.created_at_epoch_ms,
+              sessions.updated_at_epoch_ms
+            FROM interview_sessions AS sessions
+            LEFT JOIN (
+              SELECT session_id, COUNT(*) AS total_rounds
+              FROM interview_rounds
+              GROUP BY session_id
+            ) AS round_counts
+              ON round_counts.session_id = sessions.id
+            LEFT JOIN interview_reports AS reports
+              ON reports.session_id = sessions.id
+            ORDER BY sessions.updated_at_epoch_ms DESC, sessions.created_at_epoch_ms DESC
+            "#,
+        )
+        .map_err(|error| format!("failed to prepare interview session list query: {error}"))?;
+
+    let rows = statement
+        .query_map([], |row| {
+            let job_title = row.get::<_, String>(3)?;
+            let report_id = row.get::<_, Option<String>>(8)?;
+            Ok(InterviewSessionListItem {
+                id: row.get::<_, String>(0)?,
+                resume_id: row.get::<_, Option<String>>(1)?,
+                job_description: row.get::<_, String>(2)?,
+                job_title: empty_string_to_none(job_title),
+                selected_interviewers: parse_json_array_or_default(&row.get::<_, String>(4)?, "[]"),
+                current_round: row.get::<_, i32>(5)?,
+                status: row.get::<_, String>(6)?,
+                total_rounds: row.get::<_, i32>(7)?,
+                has_report: report_id.is_some(),
+                overall_score: row.get::<_, Option<i32>>(9)?,
+                created_at_epoch_ms: row.get::<_, i64>(10)?,
+                updated_at_epoch_ms: row.get::<_, i64>(11)?,
+            })
+        })
+        .map_err(|error| format!("failed to query interview sessions: {error}"))?;
+
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|error| format!("failed to map interview session list row: {error}"))
+}
+
+pub fn get_interview_session(
+    app: &AppHandle,
+    session_id: &str,
+) -> Result<Option<InterviewSessionDetail>, String> {
+    let connection = open_initialized_connection(app)?;
+    load_interview_session_detail(&connection, session_id)
+}
+
+pub fn create_interview_session(
+    app: &AppHandle,
+    input: CreateInterviewSessionInput,
+) -> Result<InterviewSessionDetail, String> {
+    let job_description = input.job_description.trim().to_string();
+    if job_description.is_empty() {
+        return Err("jobDescription is required".into());
+    }
+    if input.rounds.is_empty() {
+        return Err("at least one interview round is required".into());
+    }
+
+    let mut connection = open_initialized_connection(app)?;
+    let transaction = connection
+        .transaction()
+        .map_err(|error| format!("failed to start interview session transaction: {error}"))?;
+
+    if let Some(resume_id) = input
+        .resume_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        let resume_exists = transaction
+            .query_row(
+                "SELECT 1 FROM documents WHERE id = ?1",
+                params![resume_id],
+                |_| Ok(true),
+            )
+            .optional()
+            .map_err(|error| format!("failed to validate resume for interview session: {error}"))?
+            .unwrap_or(false);
+        if !resume_exists {
+            return Err(format!("resume not found: {resume_id}"));
+        }
+    }
+
+    let now = now_epoch_ms()? as i64;
+    let session_id = Uuid::new_v4().to_string();
+    let selected_interviewers = input
+        .rounds
+        .iter()
+        .map(|round| round.interviewer_config.clone())
+        .collect::<Vec<_>>();
+    let selected_interviewers_json = serde_json::to_string(&selected_interviewers)
+        .map_err(|error| format!("failed to serialize interviewer config list: {error}"))?;
+    let resume_id = normalize_optional_string(input.resume_id);
+    let job_title = input.job_title.unwrap_or_default().trim().to_string();
+
+    transaction
+        .execute(
+            r#"
+            INSERT INTO interview_sessions (
+              id,
+              resume_id,
+              job_description,
+              job_title,
+              selected_interviewers_json,
+              current_round,
+              status,
+              created_at_epoch_ms,
+              updated_at_epoch_ms
+            ) VALUES (?1, ?2, ?3, ?4, ?5, 0, 'preparing', ?6, ?6)
+            "#,
+            params![
+                &session_id,
+                &resume_id,
+                &job_description,
+                &job_title,
+                &selected_interviewers_json,
+                now
+            ],
+        )
+        .map_err(|error| format!("failed to create interview session: {error}"))?;
+
+    for (index, round) in input.rounds.iter().enumerate() {
+        let interviewer_type = round.interviewer_type.trim().to_string();
+        if interviewer_type.is_empty() {
+            return Err(format!("round {} is missing interviewerType", index + 1));
+        }
+
+        let interviewer_config_json = serde_json::to_string(&round.interviewer_config)
+            .map_err(|error| format!("failed to serialize round interviewer config: {error}"))?;
+        let round_id = Uuid::new_v4().to_string();
+        let max_questions = round.max_questions.unwrap_or(8).clamp(1, 20);
+
+        transaction
+            .execute(
+                r#"
+                INSERT INTO interview_rounds (
+                  id,
+                  session_id,
+                  interviewer_type,
+                  interviewer_config_json,
+                  sort_order,
+                  status,
+                  question_count,
+                  max_questions,
+                  summary_json,
+                  created_at_epoch_ms,
+                  updated_at_epoch_ms
+                ) VALUES (?1, ?2, ?3, ?4, ?5, 'pending', 0, ?6, NULL, ?7, ?7)
+                "#,
+                params![
+                    &round_id,
+                    &session_id,
+                    &interviewer_type,
+                    &interviewer_config_json,
+                    index as i32,
+                    max_questions,
+                    now
+                ],
+            )
+            .map_err(|error| format!("failed to create interview round {}: {error}", index + 1))?;
+    }
+
+    transaction
+        .commit()
+        .map_err(|error| format!("failed to commit interview session transaction: {error}"))?;
+
+    get_interview_session(app, &session_id)?
+        .ok_or_else(|| format!("created interview session not found: {session_id}"))
+}
+
+pub fn update_interview_message_metadata(
+    app: &AppHandle,
+    input: UpdateInterviewMessageMetadataInput,
+) -> Result<InterviewMessageItem, String> {
+    if !input.metadata.is_object() {
+        return Err("metadata must be a JSON object".into());
+    }
+
+    let connection = open_initialized_connection(app)?;
+    let existing = connection
+        .query_row(
+            "SELECT metadata_json, round_id FROM interview_messages WHERE id = ?1",
+            params![&input.message_id],
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+        )
+        .optional()
+        .map_err(|error| format!("failed to load interview message metadata: {error}"))?
+        .ok_or_else(|| format!("interview message not found: {}", input.message_id))?;
+
+    let merged_metadata = merge_json_objects(parse_json_or_default(&existing.0, "{}"), input.metadata)?;
+    let now = now_epoch_ms()? as i64;
+    connection
+        .execute(
+            r#"
+            UPDATE interview_messages
+            SET metadata_json = ?2, updated_at_epoch_ms = ?3
+            WHERE id = ?1
+            "#,
+            params![
+                &input.message_id,
+                serde_json::to_string(&merged_metadata)
+                    .map_err(|error| format!("failed to serialize merged interview metadata: {error}"))?,
+                now
+            ],
+        )
+        .map_err(|error| format!("failed to update interview message metadata: {error}"))?;
+    touch_interview_round_and_session(&connection, &existing.1, now)?;
+
+    load_interview_message(&connection, &input.message_id)?
+        .ok_or_else(|| format!("interview message not found after update: {}", input.message_id))
+}
+
+pub fn get_interview_report(
+    app: &AppHandle,
+    session_id: &str,
+) -> Result<Option<InterviewReportRecord>, String> {
+    let connection = open_initialized_connection(app)?;
+    load_interview_report(&connection, session_id)
+}
+
+pub fn add_interview_message(
+    app: &AppHandle,
+    input: AddInterviewMessageInput,
+) -> Result<InterviewMessageItem, String> {
+    let round_id = input.round_id.trim().to_string();
+    if round_id.is_empty() {
+        return Err("roundId is required".into());
+    }
+
+    let role = normalize_interview_message_role(&input.role)?;
+    let content = input.content.trim().to_string();
+    if content.is_empty() {
+        return Err("content is required".into());
+    }
+
+    let connection = open_initialized_connection(app)?;
+    let round_exists = connection
+        .query_row(
+            "SELECT 1 FROM interview_rounds WHERE id = ?1",
+            params![&round_id],
+            |_| Ok(true),
+        )
+        .optional()
+        .map_err(|error| format!("failed to validate interview round before insert: {error}"))?
+        .unwrap_or(false);
+    if !round_exists {
+        return Err(format!("interview round not found: {round_id}"));
+    }
+
+    let now = now_epoch_ms()? as i64;
+    let message_id = Uuid::new_v4().to_string();
+    let metadata = normalize_metadata_value(input.metadata.unwrap_or_else(|| json!({})))?;
+
+    connection
+        .execute(
+            r#"
+            INSERT INTO interview_messages (
+              id,
+              round_id,
+              role,
+              content,
+              metadata_json,
+              created_at_epoch_ms,
+              updated_at_epoch_ms
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6)
+            "#,
+            params![
+                &message_id,
+                &round_id,
+                role,
+                &content,
+                serde_json::to_string(&metadata)
+                    .map_err(|error| format!("failed to serialize interview metadata: {error}"))?,
+                now
+            ],
+        )
+        .map_err(|error| format!("failed to insert interview message: {error}"))?;
+    touch_interview_round_and_session(&connection, &round_id, now)?;
+
+    load_interview_message(&connection, &message_id)?
+        .ok_or_else(|| format!("interview message not found after insert: {message_id}"))
+}
+
+pub fn mark_interview_round_in_progress(
+    app: &AppHandle,
+    session_id: &str,
+    round_id: &str,
+) -> Result<(), String> {
+    let connection = open_initialized_connection(app)?;
+    let now = now_epoch_ms()? as i64;
+
+    connection
+        .execute(
+            r#"
+            UPDATE interview_rounds
+            SET status = CASE WHEN status = 'pending' THEN 'in_progress' ELSE status END,
+                updated_at_epoch_ms = ?2
+            WHERE id = ?1
+            "#,
+            params![round_id, now],
+        )
+        .map_err(|error| format!("failed to mark interview round in progress: {error}"))?;
+
+    connection
+        .execute(
+            r#"
+            UPDATE interview_sessions
+            SET status = CASE WHEN status IN ('preparing', 'paused') THEN 'in_progress' ELSE status END,
+                updated_at_epoch_ms = ?2
+            WHERE id = ?1
+            "#,
+            params![session_id, now],
+        )
+        .map_err(|error| format!("failed to mark interview session in progress: {error}"))?;
+
+    Ok(())
+}
+
+pub fn increment_interview_round_question_count(
+    app: &AppHandle,
+    round_id: &str,
+) -> Result<(), String> {
+    let connection = open_initialized_connection(app)?;
+    let now = now_epoch_ms()? as i64;
+    connection
+        .execute(
+            r#"
+            UPDATE interview_rounds
+            SET question_count = question_count + 1,
+                updated_at_epoch_ms = ?2
+            WHERE id = ?1
+            "#,
+            params![round_id, now],
+        )
+        .map_err(|error| format!("failed to increment interview round question count: {error}"))?;
+    touch_interview_round_and_session(&connection, round_id, now)?;
+    Ok(())
+}
+
+pub fn complete_interview_round(
+    app: &AppHandle,
+    session_id: &str,
+    round_id: &str,
+    summary_text: Option<String>,
+    skipped: bool,
+) -> Result<InterviewSessionDetail, String> {
+    let connection = open_initialized_connection(app)?;
+    let now = now_epoch_ms()? as i64;
+    let rounds = load_interview_rounds(&connection, session_id)?;
+    let current_index = rounds
+        .iter()
+        .position(|round| round.id == round_id)
+        .ok_or_else(|| format!("interview round not found for session {session_id}: {round_id}"))?;
+
+    let next_round = rounds.get(current_index + 1);
+    let round_status = if skipped { "skipped" } else { "completed" };
+    let summary_json = summary_text
+        .map(|summary| json!({ "feedback": summary }))
+        .map(|value| {
+            serde_json::to_string(&value)
+                .map_err(|error| format!("failed to serialize interview round summary: {error}"))
+        })
+        .transpose()?;
+
+    connection
+        .execute(
+            r#"
+            UPDATE interview_rounds
+            SET status = ?2,
+                summary_json = ?3,
+                updated_at_epoch_ms = ?4
+            WHERE id = ?1
+            "#,
+            params![round_id, round_status, summary_json, now],
+        )
+        .map_err(|error| format!("failed to complete interview round: {error}"))?;
+
+    if let Some(next_round) = next_round {
+        connection
+            .execute(
+                r#"
+                UPDATE interview_sessions
+                SET current_round = ?2,
+                    status = 'in_progress',
+                    updated_at_epoch_ms = ?3
+                WHERE id = ?1
+                "#,
+                params![session_id, next_round.sort_order, now],
+            )
+            .map_err(|error| format!("failed to advance interview session round: {error}"))?;
+    } else {
+        connection
+            .execute(
+                r#"
+                UPDATE interview_sessions
+                SET status = 'completed',
+                    updated_at_epoch_ms = ?2
+                WHERE id = ?1
+                "#,
+                params![session_id, now],
+            )
+            .map_err(|error| format!("failed to complete interview session: {error}"))?;
+    }
+
+    load_interview_session_detail(&connection, session_id)?
+        .ok_or_else(|| format!("interview session not found after completing round: {session_id}"))
+}
+
+pub fn save_interview_report(
+    app: &AppHandle,
+    input: SaveInterviewReportInput,
+) -> Result<InterviewReportRecord, String> {
+    let connection = open_initialized_connection(app)?;
+    let session_exists = connection
+        .query_row(
+            "SELECT 1 FROM interview_sessions WHERE id = ?1",
+            params![&input.session_id],
+            |_| Ok(true),
+        )
+        .optional()
+        .map_err(|error| format!("failed to validate interview session before saving report: {error}"))?
+        .unwrap_or(false);
+    if !session_exists {
+        return Err(format!("interview session not found: {}", input.session_id));
+    }
+
+    let summary = input.summary.trim().to_string();
+    let overall_feedback = input.overall_feedback.trim().to_string();
+    if summary.is_empty() {
+        return Err("report summary is required".into());
+    }
+    if overall_feedback.is_empty() {
+        return Err("report overallFeedback is required".into());
+    }
+
+    let now = now_epoch_ms()? as i64;
+    let report_id = load_interview_report(&connection, &input.session_id)?
+        .map(|report| report.id)
+        .unwrap_or_else(|| Uuid::new_v4().to_string());
+    let improvement_suggestions_json = serde_json::to_string(&input.improvement_suggestions)
+        .map_err(|error| format!("failed to serialize interview improvement suggestions: {error}"))?;
+
+    connection
+        .execute(
+            r#"
+            INSERT INTO interview_reports (
+              id,
+              session_id,
+              overall_score,
+              summary,
+              overall_feedback,
+              improvement_suggestions_json,
+              created_at_epoch_ms,
+              updated_at_epoch_ms
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)
+            ON CONFLICT(session_id) DO UPDATE SET
+              id = excluded.id,
+              overall_score = excluded.overall_score,
+              summary = excluded.summary,
+              overall_feedback = excluded.overall_feedback,
+              improvement_suggestions_json = excluded.improvement_suggestions_json,
+              updated_at_epoch_ms = excluded.updated_at_epoch_ms
+            "#,
+            params![
+                report_id,
+                input.session_id,
+                input.overall_score.clamp(0, 100),
+                summary,
+                overall_feedback,
+                improvement_suggestions_json,
+                now
+            ],
+        )
+        .map_err(|error| format!("failed to save interview report: {error}"))?;
+
+    connection
+        .execute(
+            r#"
+            UPDATE interview_sessions
+            SET updated_at_epoch_ms = ?2
+            WHERE id = ?1
+            "#,
+            params![&input.session_id, now],
+        )
+        .map_err(|error| format!("failed to touch interview session after report save: {error}"))?;
+
+    load_interview_report(&connection, &input.session_id)?
+        .ok_or_else(|| format!("interview report not found after save: {}", input.session_id))
+}
+
+fn load_interview_session_detail(
+    connection: &Connection,
+    session_id: &str,
+) -> Result<Option<InterviewSessionDetail>, String> {
+    let session = connection
+        .query_row(
+            r#"
+            SELECT
+              id,
+              resume_id,
+              job_description,
+              job_title,
+              selected_interviewers_json,
+              current_round,
+              status,
+              created_at_epoch_ms,
+              updated_at_epoch_ms
+            FROM interview_sessions
+            WHERE id = ?1
+            "#,
+            params![session_id],
+            |row| {
+                let job_title = row.get::<_, String>(3)?;
+                Ok(InterviewSessionDetail {
+                    id: row.get::<_, String>(0)?,
+                    resume_id: row.get::<_, Option<String>>(1)?,
+                    job_description: row.get::<_, String>(2)?,
+                    job_title: empty_string_to_none(job_title),
+                    selected_interviewers: parse_json_array_or_default(
+                        &row.get::<_, String>(4)?,
+                        "[]",
+                    ),
+                    current_round: row.get::<_, i32>(5)?,
+                    total_rounds: 0,
+                    status: row.get::<_, String>(6)?,
+                    created_at_epoch_ms: row.get::<_, i64>(7)?,
+                    updated_at_epoch_ms: row.get::<_, i64>(8)?,
+                    rounds: Vec::new(),
+                    report: None,
+                })
+            },
+        )
+        .optional()
+        .map_err(|error| format!("failed to query interview session {session_id}: {error}"))?;
+
+    let Some(mut session) = session else {
+        return Ok(None);
+    };
+
+    session.rounds = load_interview_rounds(connection, session_id)?;
+    session.total_rounds = session.rounds.len() as i32;
+    session.report = load_interview_report(connection, session_id)?;
+    Ok(Some(session))
+}
+
+fn load_interview_rounds(
+    connection: &Connection,
+    session_id: &str,
+) -> Result<Vec<InterviewRoundDetail>, String> {
+    let mut statement = connection
+        .prepare(
+            r#"
+            SELECT
+              id,
+              session_id,
+              interviewer_type,
+              interviewer_config_json,
+              sort_order,
+              status,
+              question_count,
+              max_questions,
+              summary_json,
+              created_at_epoch_ms,
+              updated_at_epoch_ms
+            FROM interview_rounds
+            WHERE session_id = ?1
+            ORDER BY sort_order ASC, created_at_epoch_ms ASC
+            "#,
+        )
+        .map_err(|error| format!("failed to prepare interview round query: {error}"))?;
+
+    let rows = statement
+        .query_map(params![session_id], |row| {
+            Ok(InterviewRoundDetail {
+                id: row.get::<_, String>(0)?,
+                session_id: row.get::<_, String>(1)?,
+                interviewer_type: row.get::<_, String>(2)?,
+                interviewer_config: parse_json_or_default(&row.get::<_, String>(3)?, "{}"),
+                sort_order: row.get::<_, i32>(4)?,
+                status: row.get::<_, String>(5)?,
+                question_count: row.get::<_, i32>(6)?,
+                max_questions: row.get::<_, i32>(7)?,
+                summary: row
+                    .get::<_, Option<String>>(8)?
+                    .map(|raw| parse_json_or_default(&raw, "{}")),
+                created_at_epoch_ms: row.get::<_, i64>(9)?,
+                updated_at_epoch_ms: row.get::<_, i64>(10)?,
+                messages: Vec::new(),
+            })
+        })
+        .map_err(|error| format!("failed to query interview rounds for {session_id}: {error}"))?;
+
+    let mut rounds = rows
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| format!("failed to map interview rounds for {session_id}: {error}"))?;
+
+    for round in &mut rounds {
+        round.messages = load_interview_messages(connection, &round.id)?;
+    }
+
+    Ok(rounds)
+}
+
+fn load_interview_messages(
+    connection: &Connection,
+    round_id: &str,
+) -> Result<Vec<InterviewMessageItem>, String> {
+    let mut statement = connection
+        .prepare(
+            r#"
+            SELECT
+              id,
+              round_id,
+              role,
+              content,
+              metadata_json,
+              created_at_epoch_ms,
+              updated_at_epoch_ms
+            FROM interview_messages
+            WHERE round_id = ?1
+            ORDER BY created_at_epoch_ms ASC, id ASC
+            "#,
+        )
+        .map_err(|error| format!("failed to prepare interview message query: {error}"))?;
+
+    let rows = statement
+        .query_map(params![round_id], |row| {
+            Ok(InterviewMessageItem {
+                id: row.get::<_, String>(0)?,
+                round_id: row.get::<_, String>(1)?,
+                role: row.get::<_, String>(2)?,
+                content: row.get::<_, String>(3)?,
+                metadata: parse_json_or_default(&row.get::<_, String>(4)?, "{}"),
+                created_at_epoch_ms: row.get::<_, i64>(5)?,
+                updated_at_epoch_ms: row.get::<_, i64>(6)?,
+            })
+        })
+        .map_err(|error| format!("failed to query interview messages for {round_id}: {error}"))?;
+
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|error| format!("failed to map interview messages for {round_id}: {error}"))
+}
+
+fn load_interview_message(
+    connection: &Connection,
+    message_id: &str,
+) -> Result<Option<InterviewMessageItem>, String> {
+    connection
+        .query_row(
+            r#"
+            SELECT
+              id,
+              round_id,
+              role,
+              content,
+              metadata_json,
+              created_at_epoch_ms,
+              updated_at_epoch_ms
+            FROM interview_messages
+            WHERE id = ?1
+            "#,
+            params![message_id],
+            |row| {
+                Ok(InterviewMessageItem {
+                    id: row.get::<_, String>(0)?,
+                    round_id: row.get::<_, String>(1)?,
+                    role: row.get::<_, String>(2)?,
+                    content: row.get::<_, String>(3)?,
+                    metadata: parse_json_or_default(&row.get::<_, String>(4)?, "{}"),
+                    created_at_epoch_ms: row.get::<_, i64>(5)?,
+                    updated_at_epoch_ms: row.get::<_, i64>(6)?,
+                })
+            },
+        )
+        .optional()
+        .map_err(|error| format!("failed to query interview message {message_id}: {error}"))
+}
+
+fn load_interview_report(
+    connection: &Connection,
+    session_id: &str,
+) -> Result<Option<InterviewReportRecord>, String> {
+    connection
+        .query_row(
+            r#"
+            SELECT
+              id,
+              session_id,
+              overall_score,
+              summary,
+              overall_feedback,
+              improvement_suggestions_json,
+              created_at_epoch_ms,
+              updated_at_epoch_ms
+            FROM interview_reports
+            WHERE session_id = ?1
+            "#,
+            params![session_id],
+            |row| {
+                Ok(InterviewReportRecord {
+                    id: row.get::<_, String>(0)?,
+                    session_id: row.get::<_, String>(1)?,
+                    overall_score: row.get::<_, i32>(2)?,
+                    summary: row.get::<_, String>(3)?,
+                    overall_feedback: row.get::<_, String>(4)?,
+                    improvement_suggestions: parse_string_array_or_default(
+                        &row.get::<_, String>(5)?,
+                        "[]",
+                    ),
+                    created_at_epoch_ms: row.get::<_, i64>(6)?,
+                    updated_at_epoch_ms: row.get::<_, i64>(7)?,
+                })
+            },
+        )
+        .optional()
+        .map_err(|error| format!("failed to query interview report for {session_id}: {error}"))
+}
+
+fn touch_interview_round_and_session(
+    connection: &Connection,
+    round_id: &str,
+    now: i64,
+) -> Result<(), String> {
+    let session_id = connection
+        .query_row(
+            "SELECT session_id FROM interview_rounds WHERE id = ?1",
+            params![round_id],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()
+        .map_err(|error| format!("failed to resolve interview round session linkage: {error}"))?
+        .ok_or_else(|| format!("interview round not found: {round_id}"))?;
+
+    connection
+        .execute(
+            "UPDATE interview_rounds SET updated_at_epoch_ms = ?2 WHERE id = ?1",
+            params![round_id, now],
+        )
+        .map_err(|error| format!("failed to touch interview round {round_id}: {error}"))?;
+    connection
+        .execute(
+            "UPDATE interview_sessions SET updated_at_epoch_ms = ?2 WHERE id = ?1",
+            params![session_id, now],
+        )
+        .map_err(|error| format!("failed to touch interview session for round {round_id}: {error}"))?;
+
+    Ok(())
+}
+
+fn normalize_interview_message_role(role: &str) -> Result<&'static str, String> {
+    match role.trim() {
+        "interviewer" => Ok("interviewer"),
+        "candidate" => Ok("candidate"),
+        "system" => Ok("system"),
+        other => Err(format!(
+            "unsupported interview message role '{other}', expected interviewer|candidate|system"
+        )),
+    }
+}
+
+fn normalize_optional_string(value: Option<String>) -> Option<String> {
+    value
+        .map(|inner| inner.trim().to_string())
+        .filter(|inner| !inner.is_empty())
+}
+
+fn empty_string_to_none(value: String) -> Option<String> {
+    let trimmed = value.trim().to_string();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed)
+    }
+}
+
+fn normalize_metadata_value(value: Value) -> Result<Value, String> {
+    if value.is_object() {
+        Ok(value)
+    } else {
+        Err("metadata must be a JSON object".into())
+    }
+}
+
+fn merge_json_objects(existing: Value, patch: Value) -> Result<Value, String> {
+    let Some(existing_map) = existing.as_object() else {
+        return Err("existing metadata is not a JSON object".into());
+    };
+    let Some(patch_map) = patch.as_object() else {
+        return Err("patch metadata is not a JSON object".into());
+    };
+
+    let mut merged = existing_map.clone();
+    for (key, value) in patch_map {
+        merged.insert(key.clone(), value.clone());
+    }
+    Ok(Value::Object(merged))
+}
+
+fn parse_json_array_or_default(raw: &str, fallback: &str) -> Vec<Value> {
+    parse_json_or_default(raw, fallback)
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+}
+
+fn parse_string_array_or_default(raw: &str, fallback: &str) -> Vec<String> {
+    parse_json_or_default(raw, fallback)
+        .as_array()
+        .map(|values| {
+            values
+                .iter()
+                .filter_map(|value| value.as_str().map(ToString::to_string))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default()
 }
 
 // =====================================================

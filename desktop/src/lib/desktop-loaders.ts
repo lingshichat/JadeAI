@@ -1,7 +1,12 @@
 import {
+  getDocument,
   getDomainContractSummary,
   getImporterDryRun,
+  getInterviewReport,
+  getInterviewSession,
   getLegacyImportContract,
+  listDocuments,
+  listInterviewSessions,
   getReleaseReadinessSnapshot,
   getSecretInventorySnapshot,
   getSecretVaultStatus,
@@ -9,6 +14,7 @@ import {
   getTemplateValidationSnapshot,
   getWorkspaceSettingsSnapshot,
   getWorkspaceSnapshot,
+  type DesktopDocumentListItem,
   type DomainContractSummary,
   type ImporterDryRunSnapshot,
   type ProviderRuntimeContract,
@@ -21,6 +27,11 @@ import {
   type ReleaseReadinessSnapshot,
   type SecretInventorySnapshot,
 } from "./desktop-api";
+import type {
+  InterviewReport,
+  InterviewSession,
+  InterviewSessionDetail,
+} from "../types/interview";
 
 export interface HomeRouteData {
   workspace: WorkspaceSnapshot;
@@ -52,6 +63,23 @@ export interface SettingsRouteData {
   secretInventory: SecretInventorySnapshot;
   domainContract: DomainContractSummary;
   releaseReadiness: ReleaseReadinessSnapshot;
+}
+
+export interface InterviewLobbyRouteData {
+  sessions: InterviewSession[];
+}
+
+export interface InterviewSetupRouteData {
+  resumes: DesktopDocumentListItem[];
+}
+
+export interface InterviewSessionRouteData {
+  session: InterviewSessionDetail | null;
+}
+
+export interface InterviewReportRouteData {
+  session: InterviewSessionDetail | null;
+  report: InterviewReport | null;
 }
 
 export interface ProviderRegistryEntry {
@@ -99,6 +127,36 @@ export function getProviderRegistryEntries(
         isDefault: settings.ai.defaultProvider === provider,
       };
     });
+}
+
+function attachInterviewResumeTitles(
+  sessions: InterviewSession[],
+  resumes: DesktopDocumentListItem[],
+): InterviewSession[] {
+  const resumeTitleById = new Map(
+    resumes.map((resume) => [resume.id, resume.title] as const),
+  );
+
+  return sessions.map((session) => ({
+    ...session,
+    resumeTitle: session.resumeId
+      ? resumeTitleById.get(session.resumeId) ?? null
+      : null,
+  }));
+}
+
+function attachInterviewSessionResumeTitle(
+  session: InterviewSessionDetail | null,
+  resumeTitle?: string | null,
+): InterviewSessionDetail | null {
+  if (!session) {
+    return null;
+  }
+
+  return {
+    ...session,
+    resumeTitle: session.resumeId ? resumeTitle ?? null : null,
+  };
 }
 
 export async function loadHomeRouteData(): Promise<HomeRouteData> {
@@ -175,5 +233,47 @@ export async function loadSettingsRouteData(): Promise<SettingsRouteData> {
     secretInventory,
     domainContract,
     releaseReadiness,
+  };
+}
+
+export async function loadInterviewLobbyRouteData(): Promise<InterviewLobbyRouteData> {
+  const [sessions, resumes] = await Promise.all([
+    listInterviewSessions(),
+    listDocuments(),
+  ]);
+
+  return {
+    sessions: attachInterviewResumeTitles(sessions, resumes),
+  };
+}
+
+export async function loadInterviewSetupRouteData(): Promise<InterviewSetupRouteData> {
+  const resumes = await listDocuments();
+  return { resumes };
+}
+
+export async function loadInterviewSessionRouteData(
+  sessionId: string,
+): Promise<InterviewSessionRouteData> {
+  const session = await getInterviewSession(sessionId);
+  const resume = session?.resumeId ? await getDocument(session.resumeId) : null;
+
+  return {
+    session: attachInterviewSessionResumeTitle(session, resume?.title ?? null),
+  };
+}
+
+export async function loadInterviewReportRouteData(
+  sessionId: string,
+): Promise<InterviewReportRouteData> {
+  const [session, report] = await Promise.all([
+    getInterviewSession(sessionId),
+    getInterviewReport(sessionId),
+  ]);
+  const resume = session?.resumeId ? await getDocument(session.resumeId) : null;
+
+  return {
+    session: attachInterviewSessionResumeTitle(session, resume?.title ?? null),
+    report,
   };
 }

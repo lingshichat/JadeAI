@@ -127,6 +127,97 @@
       }
     }
   },
+  "interview": {
+    "navLabel": "Interview",
+    "dashboardCta": "Interview Practice",
+    "fallback": {
+      "title": "Native desktop runtime required",
+      "body": "Interview sessions, streamed follow-up questions, and report generation rely on native Tauri commands. Launch the desktop app to use this feature."
+    },
+    "actions": {
+      "title": "Quick Actions",
+      "backToLobby": "Back to Interview Lobby",
+      "generateReport": "Generate Report"
+    },
+    "lobby": {
+      "title": "JD Mock Interview",
+      "subtitle": "Paste a job description, pick any mix of the 6 preset interviewer roles, practice each round in sequence, and finish with a desktop report you can review.",
+      "newSession": "New Interview",
+      "emptyTitle": "No interview history yet",
+      "emptyBody": "Start from a job description, pick the interviewer roles you want to practice with, and jump straight into a saved desktop interview flow.",
+      "completed": "Completed",
+      "progress": "Round {current}/{total}",
+      "roleCount": "{count} interviewers",
+      "viewReport": "View Report",
+      "resume": "Resume Interview"
+    },
+    "setup": {
+      "pageTitle": "Prepare a new mock interview",
+      "pageSubtitle": "Lock in the job description first, then decide the interviewer sequence. JD is required; linking a resume is optional.",
+      "title": "Interview Setup",
+      "subtitle": "This MVP runs the interviewers in the order you choose, saves each round locally, and takes you straight to the report when the final round ends.",
+      "jobTitleLabel": "Job title",
+      "jobTitlePlaceholder": "For example: Senior Frontend Engineer / Product Manager / Staff Engineer",
+      "jdLabel": "Job description",
+      "jdPlaceholder": "Paste the full JD, including responsibilities, requirements, and bonus points. The more complete it is, the more realistic the questions will feel.",
+      "jdHint": "A good JD usually includes responsibilities, hard requirements, and business context.",
+      "resumeLabel": "Linked resume",
+      "resumePlaceholder": "Select an existing resume",
+      "resumeOptional": "No linked resume",
+      "rolesLabel": "Choose interviewer roles",
+      "rolesHint": "Click a role card to add or remove it. Use the right column to reorder the rounds.",
+      "selected": "Selected",
+      "add": "Add",
+      "selectionTitle": "Interview overview",
+      "selectionSubtitle": "Every round is saved to the local workspace, and a basic report is generated at the end.",
+      "jdPending": "Once you add the JD, this area will show a quick summary of the session.",
+      "orderLabel": "Question order",
+      "rolesEmpty": "Choose at least one interviewer to begin.",
+      "creating": "Creating...",
+      "start": "Start Interview",
+      "createError": "Failed to create the interview. Please try again."
+    },
+    "room": {
+      "loadError": "Failed to load the interview session.",
+      "streamError": "The interview stream failed.",
+      "loading": "Loading interview room...",
+      "notFoundTitle": "Interview not found",
+      "notFoundBody": "It may have been deleted, or the native workspace has not finished initializing yet.",
+      "roundTitle": "Round {current}/{total}",
+      "questionProgress": "{current}/{total} prompts",
+      "focusAreas": "Round focus",
+      "waiting": "Preparing the opening question for this interviewer...",
+      "candidate": "You",
+      "system": "System",
+      "marked": "Marked for review",
+      "streaming": "Streaming...",
+      "hint": "Ask for a hint",
+      "skip": "Skip question",
+      "mark": "Mark last answer",
+      "endRound": "End round",
+      "inputPlaceholder": "Type your answer here. The more concrete and specific you are, the better the follow-up questions will be.",
+      "autosaveHint": "Each turn is saved to the local workspace automatically.",
+      "send": "Send Answer",
+      "sidebarTitle": "Session context",
+      "jdLabel": "Job description",
+      "resumeLabel": "Linked resume",
+      "roundsLabel": "Round progress",
+      "markError": "Failed to update the review marker."
+    },
+    "report": {
+      "generateError": "Failed to generate the report. Please try again.",
+      "generating": "Generating report...",
+      "notFoundTitle": "No report to show yet",
+      "notFoundBody": "The basic report is generated automatically after the last round finishes.",
+      "reviewTranscript": "Review Transcript",
+      "subtitle": "The MVP report includes an overall score, a short summary, overall feedback, and concrete improvement suggestions.",
+      "score": "Overall score",
+      "summaryTitle": "Summary",
+      "feedbackTitle": "Overall feedback",
+      "improvementsTitle": "Improvement suggestions",
+      "improvementsHint": "These suggestions prioritize the gaps that showed up most clearly during the interview."
+    }
+  },
   "editor": {
     "toolbar": {
       "undo": "Undo",

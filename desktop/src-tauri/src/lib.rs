@@ -21,9 +21,11 @@ use settings::{
     WorkspaceAppearanceSettingsUpdateInput, WorkspaceSettingsDocument,
 };
 use storage::{
-    CreateDocumentInput, DocumentDetail, DocumentListItem, ImportDocumentInput, SaveDocumentInput,
-    StorageSnapshot, TemplateValidationExportWriteResult, TemplateValidationSnapshot,
-    UpdateDocumentInput,
+    CreateDocumentInput, CreateInterviewSessionInput, DocumentDetail, DocumentListItem,
+    ImportDocumentInput, InterviewMessageItem, InterviewReportRecord,
+    InterviewSessionDetail, InterviewSessionListItem, SaveDocumentInput, StorageSnapshot,
+    TemplateValidationExportWriteResult, TemplateValidationSnapshot, UpdateDocumentInput,
+    UpdateInterviewMessageMetadataInput,
 };
 use tauri::Manager;
 use workspace::WorkspaceSnapshot;
@@ -266,6 +268,63 @@ fn start_ai_prompt_stream(
 }
 
 #[tauri::command]
+fn list_interview_sessions(
+    app: tauri::AppHandle,
+) -> Result<Vec<InterviewSessionListItem>, String> {
+    storage::list_interview_sessions(&app)
+}
+
+#[tauri::command]
+fn get_interview_session(
+    app: tauri::AppHandle,
+    session_id: String,
+) -> Result<Option<InterviewSessionDetail>, String> {
+    storage::get_interview_session(&app, &session_id)
+}
+
+#[tauri::command]
+fn create_interview_session(
+    app: tauri::AppHandle,
+    input: CreateInterviewSessionInput,
+) -> Result<InterviewSessionDetail, String> {
+    storage::create_interview_session(&app, input)
+}
+
+#[tauri::command]
+fn update_interview_message_metadata(
+    app: tauri::AppHandle,
+    input: UpdateInterviewMessageMetadataInput,
+) -> Result<InterviewMessageItem, String> {
+    storage::update_interview_message_metadata(&app, input)
+}
+
+#[tauri::command]
+fn get_interview_report(
+    app: tauri::AppHandle,
+    session_id: String,
+) -> Result<Option<InterviewReportRecord>, String> {
+    storage::get_interview_report(&app, &session_id)
+}
+
+#[tauri::command]
+async fn generate_interview_report(
+    app: tauri::AppHandle,
+    input: ai::GenerateInterviewReportInput,
+) -> Result<InterviewReportRecord, String> {
+    let workspace_root = resolve_workspace_root(&app)?;
+    ai::generate_interview_report(&app, &workspace_root, input).await
+}
+
+#[tauri::command]
+fn start_interview_turn_stream(
+    app: tauri::AppHandle,
+    input: ai::StartInterviewTurnStreamInput,
+) -> Result<ai::AiStreamStartReceipt, String> {
+    let workspace_root = resolve_workspace_root(&app)?;
+    ai::start_interview_turn_stream(&app, &workspace_root, input)
+}
+
+#[tauri::command]
 async fn fetch_ai_models(
     app: tauri::AppHandle,
     provider: Option<String>,
@@ -399,6 +458,13 @@ pub fn run() {
             update_workspace_appearance_settings,
             write_secret_value,
             start_ai_prompt_stream,
+            list_interview_sessions,
+            get_interview_session,
+            create_interview_session,
+            update_interview_message_metadata,
+            get_interview_report,
+            generate_interview_report,
+            start_interview_turn_stream,
             fetch_ai_models,
             test_ai_connectivity,
             test_exa_connectivity,

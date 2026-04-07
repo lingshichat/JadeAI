@@ -1,5 +1,18 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import type {
+  CreateInterviewSessionInput,
+  GenerateInterviewReportInput,
+  InterviewerConfig,
+  InterviewMessage,
+  InterviewMessageMetadata,
+  InterviewReport,
+  InterviewSession,
+  InterviewSessionDetail,
+  InterviewRound,
+  StartInterviewTurnStreamInput,
+  UpdateInterviewMessageMetadataInput,
+} from "../types/interview";
 
 export type DesktopRuntimeMode = "tauri" | "browser_fallback";
 
@@ -682,6 +695,72 @@ export interface AppUpdateCheckResult {
   pubDate?: string | null;
 }
 
+interface RawInterviewSessionListItem {
+  id: string;
+  resumeId?: string | null;
+  jobDescription: string;
+  jobTitle?: string | null;
+  selectedInterviewers: unknown;
+  currentRound: number;
+  totalRounds: number;
+  status: InterviewSession["status"];
+  hasReport: boolean;
+  overallScore?: number | null;
+  createdAtEpochMs: number;
+  updatedAtEpochMs: number;
+}
+
+interface RawInterviewMessageItem {
+  id: string;
+  roundId: string;
+  role: InterviewMessage["role"];
+  content: string;
+  metadata: unknown;
+  createdAtEpochMs: number;
+  updatedAtEpochMs: number;
+}
+
+interface RawInterviewRoundDetail {
+  id: string;
+  sessionId: string;
+  interviewerType: string;
+  interviewerConfig: unknown;
+  sortOrder: number;
+  status: InterviewRound["status"];
+  questionCount: number;
+  maxQuestions: number;
+  summary?: unknown;
+  createdAtEpochMs: number;
+  updatedAtEpochMs: number;
+  messages: RawInterviewMessageItem[];
+}
+
+interface RawInterviewReportRecord {
+  id: string;
+  sessionId: string;
+  overallScore: number;
+  summary: string;
+  overallFeedback: string;
+  improvementSuggestions: string[];
+  createdAtEpochMs: number;
+  updatedAtEpochMs: number;
+}
+
+interface RawInterviewSessionDetail {
+  id: string;
+  resumeId?: string | null;
+  jobDescription: string;
+  jobTitle?: string | null;
+  selectedInterviewers: unknown;
+  currentRound: number;
+  totalRounds: number;
+  status: InterviewSession["status"];
+  createdAtEpochMs: number;
+  updatedAtEpochMs: number;
+  rounds: RawInterviewRoundDetail[];
+  report?: RawInterviewReportRecord | null;
+}
+
 const FALLBACK_CONTEXT: BootstrapContext = {
   appName: "RoleRover Desktop",
   appVersion: "0.1.0",
@@ -700,7 +779,7 @@ const FALLBACK_CONTEXT: BootstrapContext = {
 };
 
 const FALLBACK_WORKSPACE: WorkspaceSnapshot = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   workspaceId: "browser-fallback",
   bootstrapStatus: "created",
   migrationStatus: "cleanWorkspace",
@@ -719,7 +798,7 @@ const FALLBACK_WORKSPACE: WorkspaceSnapshot = {
 };
 
 const FALLBACK_STORAGE: StorageSnapshot = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   bootstrapStatus: "created",
   workspaceRoot: "desktop/workspace",
   databasePath: "desktop/workspace/rolerover.db",
@@ -799,7 +878,7 @@ const FALLBACK_DOMAIN_CONTRACT: DomainContractSummary = {
       path: "workspace/imports/legacy/jade.db",
       storageProfile: "electron-next-local",
     },
-    targetSchemaVersion: 1,
+    targetSchemaVersion: 2,
     status: "pending",
     checkpoints: [
       {
@@ -1017,7 +1096,7 @@ const FALLBACK_IMPORTER_DRY_RUN: ImporterDryRunSnapshot = {
       isReadyForTransform: false,
     },
     transform: {
-      targetSchemaVersion: 1,
+      targetSchemaVersion: 2,
       steps: [],
       droppedSurfaces: [],
     },
@@ -1283,6 +1362,164 @@ const FALLBACK_RELEASE_READINESS: ReleaseReadinessSnapshot = {
   ],
 };
 
+function deriveInterviewTitle(
+  jobTitle: string | null | undefined,
+  jobDescription: string,
+): string {
+  const normalizedTitle = jobTitle?.trim();
+  if (normalizedTitle) {
+    return normalizedTitle;
+  }
+
+  const firstLine = jobDescription
+    .split("\n")
+    .map((line) => line.trim())
+    .find((line) => line.length > 0);
+
+  return firstLine || "Interview Session";
+}
+
+function normalizeInterviewerConfig(value: unknown): InterviewerConfig {
+  const record =
+    typeof value === "object" && value !== null && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
+
+  return {
+    type: String(record.type ?? "hr") as InterviewerConfig["type"],
+    name: String(record.name ?? ""),
+    title: String(record.title ?? ""),
+    avatar: String(record.avatar ?? ""),
+    bio: String(record.bio ?? ""),
+    style: String(record.style ?? ""),
+    focusAreas: Array.isArray(record.focusAreas)
+      ? record.focusAreas
+          .map((item) => (typeof item === "string" ? item : ""))
+          .filter((item) => item.length > 0)
+      : [],
+    systemPrompt: String(record.systemPrompt ?? ""),
+    personality: String(record.personality ?? ""),
+  };
+}
+
+function normalizeInterviewerConfigList(value: unknown): InterviewerConfig[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.map(normalizeInterviewerConfig);
+}
+
+function normalizeInterviewMessageMetadata(value: unknown): InterviewMessageMetadata {
+  const record =
+    typeof value === "object" && value !== null && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
+
+  return {
+    marked: record.marked === true,
+    hinted: record.hinted === true,
+    skipped: record.skipped === true,
+  };
+}
+
+function normalizeInterviewMessage(item: RawInterviewMessageItem): InterviewMessage {
+  return {
+    id: item.id,
+    roundId: item.roundId,
+    role: item.role,
+    content: item.content,
+    metadata: normalizeInterviewMessageMetadata(item.metadata),
+    createdAtEpochMs: item.createdAtEpochMs,
+  };
+}
+
+function normalizeInterviewRound(item: RawInterviewRoundDetail): InterviewRound {
+  const summaryRecord =
+    typeof item.summary === "object" && item.summary !== null && !Array.isArray(item.summary)
+      ? (item.summary as Record<string, unknown>)
+      : null;
+
+  return {
+    id: item.id,
+    sessionId: item.sessionId,
+    interviewerType: item.interviewerType as InterviewRound["interviewerType"],
+    interviewerConfig: normalizeInterviewerConfig(item.interviewerConfig),
+    sortOrder: item.sortOrder,
+    status: item.status,
+    questionCount: item.questionCount,
+    maxQuestions: item.maxQuestions,
+    summary: summaryRecord
+      ? {
+          score:
+            typeof summaryRecord.score === "number" ? summaryRecord.score : null,
+          feedback: String(summaryRecord.feedback ?? ""),
+        }
+      : null,
+    messages: item.messages.map(normalizeInterviewMessage),
+    createdAtEpochMs: item.createdAtEpochMs,
+    updatedAtEpochMs: item.updatedAtEpochMs,
+  };
+}
+
+function normalizeInterviewReport(
+  item: RawInterviewReportRecord,
+): InterviewReport {
+  return {
+    id: item.id,
+    sessionId: item.sessionId,
+    overallScore: item.overallScore,
+    summary: item.summary,
+    overallFeedback: item.overallFeedback,
+    improvementSuggestions: Array.isArray(item.improvementSuggestions)
+      ? item.improvementSuggestions.filter((suggestion): suggestion is string => {
+          return typeof suggestion === "string" && suggestion.trim().length > 0;
+        })
+      : [],
+    createdAtEpochMs: item.createdAtEpochMs,
+  };
+}
+
+function normalizeInterviewSession(
+  item: RawInterviewSessionListItem,
+): InterviewSession {
+  return {
+    id: item.id,
+    resumeId: item.resumeId ?? null,
+    resumeTitle: null,
+    jobDescription: item.jobDescription,
+    jobTitle: deriveInterviewTitle(item.jobTitle, item.jobDescription),
+    selectedInterviewers: normalizeInterviewerConfigList(item.selectedInterviewers),
+    currentRound: item.currentRound,
+    status: item.status,
+    reportId: null,
+    reportOverallScore: item.overallScore ?? null,
+    createdAtEpochMs: item.createdAtEpochMs,
+    updatedAtEpochMs: item.updatedAtEpochMs,
+  };
+}
+
+function normalizeInterviewSessionDetail(
+  item: RawInterviewSessionDetail,
+): InterviewSessionDetail {
+  return {
+    id: item.id,
+    resumeId: item.resumeId ?? null,
+    resumeTitle: null,
+    jobDescription: item.jobDescription,
+    jobTitle: deriveInterviewTitle(item.jobTitle, item.jobDescription),
+    selectedInterviewers: normalizeInterviewerConfigList(item.selectedInterviewers),
+    currentRound: item.currentRound,
+    status: item.status,
+    reportId: item.report?.id ?? null,
+    reportOverallScore: item.report?.overallScore ?? null,
+    createdAtEpochMs: item.createdAtEpochMs,
+    updatedAtEpochMs: item.updatedAtEpochMs,
+    rounds: item.rounds.map(normalizeInterviewRound),
+    report: item.report ? normalizeInterviewReport(item.report) : null,
+  };
+}
+
 function reportDesktopFallback(command: string, error: unknown): void {
   console.warn(`[desktop-api] Falling back for ${command}.`, error);
 }
@@ -1509,6 +1746,109 @@ export async function startAiPromptStream(
   input: StartAiPromptStreamInput,
 ): Promise<AiStreamStartReceipt> {
   return invoke<AiStreamStartReceipt>("start_ai_prompt_stream", { input });
+}
+
+export async function listInterviewSessions(): Promise<InterviewSession[]> {
+  const sessions = await invokeWithFallback<RawInterviewSessionListItem[]>(
+    "list_interview_sessions",
+    [],
+  );
+  return sessions.map(normalizeInterviewSession);
+}
+
+export async function getInterviewSession(
+  sessionId: string,
+): Promise<InterviewSessionDetail | null> {
+  const session = await invokeWithFallback<RawInterviewSessionDetail | null>(
+    "get_interview_session",
+    null,
+    { sessionId },
+  );
+  return session ? normalizeInterviewSessionDetail(session) : null;
+}
+
+export async function createInterviewSession(
+  input: CreateInterviewSessionInput,
+): Promise<InterviewSessionDetail> {
+  const detail = await invoke<RawInterviewSessionDetail>("create_interview_session", {
+    input: {
+      resumeId: input.resumeId ?? null,
+      jobDescription: input.jobDescription,
+      jobTitle: input.jobTitle,
+      rounds: input.interviewers.map((interviewer) => ({
+        interviewerType: interviewer.type,
+        interviewerConfig: interviewer,
+        maxQuestions: 8,
+      })),
+    },
+  });
+
+  return normalizeInterviewSessionDetail(detail);
+}
+
+export async function updateInterviewMessageMetadata(
+  input: UpdateInterviewMessageMetadataInput,
+): Promise<InterviewMessage> {
+  const metadata: Record<string, boolean> = {};
+  if (typeof input.marked === "boolean") {
+    metadata.marked = input.marked;
+  }
+  if (typeof input.hinted === "boolean") {
+    metadata.hinted = input.hinted;
+  }
+  if (typeof input.skipped === "boolean") {
+    metadata.skipped = input.skipped;
+  }
+
+  const message = await invoke<RawInterviewMessageItem>(
+    "update_interview_message_metadata",
+    {
+      input: {
+        messageId: input.messageId,
+        metadata,
+      },
+    },
+  );
+
+  return normalizeInterviewMessage(message);
+}
+
+export async function getInterviewReport(
+  sessionId: string,
+): Promise<InterviewReport | null> {
+  const report = await invokeWithFallback<RawInterviewReportRecord | null>(
+    "get_interview_report",
+    null,
+    { sessionId },
+  );
+  return report ? normalizeInterviewReport(report) : null;
+}
+
+export async function generateInterviewReport(
+  input: GenerateInterviewReportInput,
+): Promise<InterviewReport> {
+  const report = await invoke<RawInterviewReportRecord>("generate_interview_report", {
+    input,
+  });
+  return normalizeInterviewReport(report);
+}
+
+export async function startInterviewTurnStream(
+  input: StartInterviewTurnStreamInput,
+): Promise<AiStreamStartReceipt> {
+  return invoke<AiStreamStartReceipt>("start_interview_turn_stream", {
+    input: {
+      sessionId: input.sessionId,
+      roundId: input.roundId,
+      kind: input.kind,
+      message: input.prompt,
+      provider: input.provider,
+      model: input.model,
+      baseUrl: input.baseUrl,
+      requestId: input.requestId,
+      locale: input.locale,
+    },
+  });
 }
 
 export interface FetchAiModelsResult {

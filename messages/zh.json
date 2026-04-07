@@ -127,6 +127,97 @@
       }
     }
   },
+  "interview": {
+    "navLabel": "面试",
+    "dashboardCta": "模拟面试",
+    "fallback": {
+      "title": "当前需要原生桌面运行时",
+      "body": "面试会话、AI 流式追问和报告生成都依赖 Tauri 原生命令。请启动桌面应用后再使用这个功能。"
+    },
+    "actions": {
+      "title": "快捷操作",
+      "backToLobby": "返回面试大厅",
+      "generateReport": "生成报告"
+    },
+    "lobby": {
+      "title": "JD 模拟面试",
+      "subtitle": "粘贴岗位 JD，选择 6 位预设面试官中的任意组合，按顺序完成多轮模拟面试，并在结束后生成一份可复盘的桌面报告。",
+      "newSession": "新建面试",
+      "emptyTitle": "还没有面试记录",
+      "emptyBody": "从一个岗位 JD 开始，选择你想练的面试官角色，就能立即进入桌面端的模拟面试流程。",
+      "completed": "已完成",
+      "progress": "第 {current}/{total} 轮",
+      "roleCount": "{count} 位面试官",
+      "viewReport": "查看报告",
+      "resume": "继续面试"
+    },
+    "setup": {
+      "pageTitle": "准备一场新的模拟面试",
+      "pageSubtitle": "先确定岗位 JD，再决定要按什么顺序接受提问。JD 必填，关联简历可选。",
+      "title": "面试设定",
+      "subtitle": "这个 MVP 会按你选定的顺序串联面试官，逐轮追问，并在最后自动进入报告页。",
+      "jobTitleLabel": "岗位标题",
+      "jobTitlePlaceholder": "例如：高级前端工程师 / 产品经理 / Staff Engineer",
+      "jdLabel": "岗位 JD",
+      "jdPlaceholder": "粘贴完整的岗位描述、职责、要求和加分项。内容越完整，提问越贴近真实场景。",
+      "jdHint": "建议至少包含岗位职责、硬性要求和业务背景。",
+      "resumeLabel": "关联简历",
+      "resumePlaceholder": "选择一份已有简历",
+      "resumeOptional": "不关联简历",
+      "rolesLabel": "选择面试官组合",
+      "rolesHint": "点击角色卡片即可加入或移除。右侧支持调整提问顺序。",
+      "selected": "已选择",
+      "add": "加入",
+      "selectionTitle": "本次面试概览",
+      "selectionSubtitle": "开始后会自动保存每一轮对话，并在最后生成基础报告。",
+      "jdPending": "输入 JD 后，这里会显示本次面试的岗位摘要。",
+      "orderLabel": "提问顺序",
+      "rolesEmpty": "至少选择一位面试官才能开始。",
+      "creating": "创建中...",
+      "start": "开始面试",
+      "createError": "创建面试失败，请稍后重试。"
+    },
+    "room": {
+      "loadError": "加载面试会话失败。",
+      "streamError": "面试流式响应失败。",
+      "loading": "正在加载面试房间...",
+      "notFoundTitle": "未找到这场面试",
+      "notFoundBody": "它可能已经被删除，或者原生工作区尚未完成初始化。",
+      "roundTitle": "第 {current}/{total} 轮",
+      "questionProgress": "{current}/{total} 问",
+      "focusAreas": "本轮重点",
+      "waiting": "系统正在准备这轮面试官的开场提问...",
+      "candidate": "你",
+      "system": "系统指令",
+      "marked": "已标记复习",
+      "streaming": "生成中...",
+      "hint": "请求提示",
+      "skip": "跳过当前题",
+      "mark": "标记上一条回答",
+      "endRound": "结束本轮",
+      "inputPlaceholder": "输入你的回答。越具体、越贴近真实经历，后续追问会越有价值。",
+      "autosaveHint": "每次发送后都会自动保存到本地工作区。",
+      "send": "发送回答",
+      "sidebarTitle": "会话上下文",
+      "jdLabel": "岗位 JD",
+      "resumeLabel": "关联简历",
+      "roundsLabel": "轮次进度",
+      "markError": "更新标记失败，请稍后重试。"
+    },
+    "report": {
+      "generateError": "生成报告失败，请稍后重试。",
+      "generating": "正在生成报告...",
+      "notFoundTitle": "还没有可展示的报告",
+      "notFoundBody": "等最后一轮完成后，系统会自动生成并保存基础报告。",
+      "reviewTranscript": "回看面试记录",
+      "subtitle": "基础报告包含综合分数、简短总结、总体反馈和后续提升建议。",
+      "score": "综合评分",
+      "summaryTitle": "总结",
+      "feedbackTitle": "总体反馈",
+      "improvementsTitle": "后续提升建议",
+      "improvementsHint": "这些建议会优先围绕本次对话里暴露出的短板来给出。"
+    }
+  },
   "editor": {
     "toolbar": {
       "undo": "撤销",

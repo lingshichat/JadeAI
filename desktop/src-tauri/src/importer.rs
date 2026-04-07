@@ -940,7 +940,7 @@ impl LegacyImporter {
 
     fn build_transform_plan() -> TransformPlan {
         TransformPlan {
-            target_schema_version: 1,
+            target_schema_version: 2,
             steps: vec![
                 TransformStep {
                     id: "users_to_workspace".into(),

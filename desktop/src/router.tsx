@@ -4,12 +4,20 @@ import { homeRoute } from "./routes/home";
 import { settingsRoute } from "./routes/settings";
 import { dashboardRoute } from "./routes/dashboard";
 import { editorRoute } from "./routes/editor";
+import { interviewNewRoute } from "./routes/interview-new";
+import { interviewReportRoute } from "./routes/interview-report";
+import { interviewSessionRoute } from "./routes/interview-session";
+import { interviewRoute } from "./routes/interview";
 import { templatesRoute } from "./routes/templates";
 
 const routeTree = rootRoute.addChildren([
   homeRoute,
   settingsRoute,
   dashboardRoute,
+  interviewRoute,
+  interviewNewRoute,
+  interviewSessionRoute,
+  interviewReportRoute,
   editorRoute,
   templatesRoute,
 ]);

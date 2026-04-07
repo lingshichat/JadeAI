@@ -1,6 +1,6 @@
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{json, Value};
 use std::{
     collections::BTreeMap,
     time::{Instant, SystemTime, UNIX_EPOCH},
@@ -31,6 +31,43 @@ pub struct StartAiPromptStreamInput {
     pub images: Vec<String>,
     #[serde(default)]
     pub conversation: Vec<DesktopAiConversationMessage>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum InterviewTurnKind {
+    Start,
+    Answer,
+    Hint,
+    Skip,
+    EndRound,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StartInterviewTurnStreamInput {
+    pub session_id: String,
+    pub round_id: Option<String>,
+    pub kind: InterviewTurnKind,
+    pub message: Option<String>,
+    pub metadata: Option<Value>,
+    pub provider: Option<String>,
+    pub model: Option<String>,
+    pub base_url: Option<String>,
+    pub request_id: Option<String>,
+    pub locale: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GenerateInterviewReportInput {
+    pub session_id: String,
+    pub provider: Option<String>,
+    pub model: Option<String>,
+    pub base_url: Option<String>,
+    pub locale: Option<String>,
+    #[serde(default)]
+    pub force_regenerate: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -124,6 +161,16 @@ struct ResolvedProviderConfig {
 struct ResolvedExaConfig {
     base_url: String,
     api_key: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct InterviewReportModelOutput {
+    overall_score: i32,
+    summary: String,
+    overall_feedback: String,
+    #[serde(default)]
+    improvement_suggestions: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -307,32 +354,341 @@ pub fn start_ai_prompt_stream(
     Ok(receipt)
 }
 
+pub fn start_interview_turn_stream(
+    app: &AppHandle,
+    workspace_root: &std::path::Path,
+    input: StartInterviewTurnStreamInput,
+) -> Result<AiStreamStartReceipt, String> {
+    let session_id = input.session_id.trim().to_string();
+    if session_id.is_empty() {
+        return Err("sessionId is required for interview streaming".into());
+    }
+
+    let resolved = resolve_provider_config_from_parts(
+        workspace_root,
+        input.provider.as_deref(),
+        input.model.as_deref(),
+        input.base_url.as_deref(),
+    )?;
+    let request_id = input
+        .request_id
+        .clone()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+    let started_at_epoch_ms = now_epoch_ms()?;
+    let receipt = AiStreamStartReceipt {
+        request_id: request_id.clone(),
+        provider: resolved.provider.clone(),
+        model: resolved.model.clone(),
+        event_name: AI_STREAM_EVENT_NAME.into(),
+        started_at_epoch_ms,
+    };
+
+    let app_handle = app.clone();
+    let workspace_root = workspace_root.to_path_buf();
+    let locale = normalize_interview_locale(input.locale.as_deref());
+
+    tauri::async_runtime::spawn(async move {
+        let run_result = if resolved.provider == "openai" {
+            run_interview_turn_stream(
+                &app_handle,
+                &workspace_root,
+                resolved.clone(),
+                request_id.clone(),
+                started_at_epoch_ms,
+                session_id,
+                input.round_id,
+                input.kind,
+                input.message,
+                input.metadata,
+                locale,
+            )
+            .await
+        } else {
+            Err(format!(
+                "provider '{}' is not wired for native interview streaming yet; MVP supports the OpenAI-compatible path first.",
+                resolved.provider
+            ))
+        };
+
+        if let Err(error) = run_result {
+            let _ = emit_stream_event(
+                &app_handle,
+                DesktopAiStreamEvent {
+                    request_id: request_id.clone(),
+                    provider: resolved.provider.clone(),
+                    model: resolved.model.clone(),
+                    kind: DesktopAiStreamEventKind::Error,
+                    started_at_epoch_ms,
+                    emitted_at_epoch_ms: now_epoch_ms().unwrap_or(started_at_epoch_ms),
+                    finished_at_epoch_ms: Some(now_epoch_ms().unwrap_or(started_at_epoch_ms)),
+                    chunk_index: None,
+                    delta_text: None,
+                    accumulated_text: None,
+                    error_message: Some(error),
+                    tool_call: None,
+                },
+            );
+        }
+    });
+
+    Ok(receipt)
+}
+
+pub async fn generate_interview_report(
+    app: &AppHandle,
+    workspace_root: &std::path::Path,
+    input: GenerateInterviewReportInput,
+) -> Result<storage::InterviewReportRecord, String> {
+    let session_id = input.session_id.trim().to_string();
+    if session_id.is_empty() {
+        return Err("sessionId is required for interview report generation".into());
+    }
+
+    let session = storage::get_interview_session(app, &session_id)?
+        .ok_or_else(|| format!("interview session not found: {session_id}"))?;
+    if let Some(report) = session.report.clone() {
+        if !input.force_regenerate {
+            return Ok(report);
+        }
+    }
+
+    let transcript_exists = session.rounds.iter().any(|round| {
+        round.messages.iter().any(|message| {
+            matches!(message.role.as_str(), "candidate" | "interviewer")
+                && !message.content.trim().is_empty()
+        })
+    });
+    if !transcript_exists {
+        return Err("cannot generate an interview report before the session has transcript content".into());
+    }
+
+    let resolved = resolve_provider_config_from_parts(
+        workspace_root,
+        input.provider.as_deref(),
+        input.model.as_deref(),
+        input.base_url.as_deref(),
+    )?;
+    if resolved.provider != "openai" {
+        return Err(format!(
+            "provider '{}' is not wired for native interview report generation yet; MVP supports the OpenAI-compatible path first.",
+            resolved.provider
+        ));
+    }
+
+    let locale = normalize_interview_locale(input.locale.as_deref());
+    let client = reqwest::Client::new();
+    let endpoint = format!("{}/chat/completions", resolved.base_url.trim_end_matches('/'));
+    let response_json = request_openai_json_completion(
+        &client,
+        &endpoint,
+        &resolved,
+        &build_interview_report_system_prompt(&locale),
+        &build_interview_report_user_prompt(&session, &locale),
+    )
+    .await?;
+    let parsed: InterviewReportModelOutput = serde_json::from_value(response_json)
+        .map_err(|error| format!("failed to parse interview report JSON response: {error}"))?;
+
+    storage::save_interview_report(
+        app,
+        storage::SaveInterviewReportInput {
+            session_id,
+            overall_score: parsed.overall_score.clamp(0, 100),
+            summary: parsed.summary.trim().to_string(),
+            overall_feedback: parsed.overall_feedback.trim().to_string(),
+            improvement_suggestions: parsed
+                .improvement_suggestions
+                .into_iter()
+                .map(|item| item.trim().to_string())
+                .filter(|item| !item.is_empty())
+                .collect(),
+        },
+    )
+}
+
+async fn run_interview_turn_stream(
+    app: &AppHandle,
+    _workspace_root: &std::path::Path,
+    config: ResolvedProviderConfig,
+    request_id: String,
+    started_at_epoch_ms: u64,
+    session_id: String,
+    requested_round_id: Option<String>,
+    kind: InterviewTurnKind,
+    message: Option<String>,
+    metadata: Option<Value>,
+    locale: String,
+) -> Result<(), String> {
+    let session = storage::get_interview_session(app, &session_id)?
+        .ok_or_else(|| format!("interview session not found: {session_id}"))?;
+    if session.rounds.is_empty() {
+        return Err(format!("interview session has no rounds: {session_id}"));
+    }
+    if session.status == "completed" {
+        return Err("this interview session is already completed".into());
+    }
+
+    let round = resolve_interview_round_for_turn(&session, requested_round_id.as_deref())?;
+    if matches!(round.status.as_str(), "completed" | "skipped") {
+        return Err(format!(
+            "interview round {} is already closed with status '{}'",
+            round.id, round.status
+        ));
+    }
+
+    let pending_message = build_interview_input_message(&kind, message, metadata, &locale)?;
+    storage::add_interview_message(
+        app,
+        storage::AddInterviewMessageInput {
+            round_id: round.id.clone(),
+            role: pending_message.0,
+            content: pending_message.1,
+            metadata: Some(pending_message.2),
+        },
+    )?;
+    storage::mark_interview_round_in_progress(app, &session.id, &round.id)?;
+
+    let refreshed_session = storage::get_interview_session(app, &session_id)?
+        .ok_or_else(|| format!("interview session not found after turn setup: {session_id}"))?;
+    let refreshed_round = resolve_interview_round_for_turn(&refreshed_session, Some(round.id.as_str()))?;
+    let resume_context = build_resume_context(app, refreshed_session.resume_id.as_deref())?;
+    let messages = build_interview_messages(&refreshed_session, &refreshed_round, resume_context, &locale);
+
+    emit_stream_event(
+        app,
+        DesktopAiStreamEvent {
+            request_id: request_id.clone(),
+            provider: config.provider.clone(),
+            model: config.model.clone(),
+            kind: DesktopAiStreamEventKind::Started,
+            started_at_epoch_ms,
+            emitted_at_epoch_ms: now_epoch_ms()?,
+            finished_at_epoch_ms: None,
+            chunk_index: Some(0),
+            delta_text: None,
+            accumulated_text: Some(String::new()),
+            error_message: None,
+            tool_call: None,
+        },
+    )?;
+
+    let client = reqwest::Client::new();
+    let endpoint = format!("{}/chat/completions", config.base_url.trim_end_matches('/'));
+    let mut accumulated_text = String::new();
+    let mut chunk_index = 0u32;
+    let outcome = stream_openai_round(
+        app,
+        &client,
+        &endpoint,
+        &request_id,
+        &config,
+        started_at_epoch_ms,
+        &messages,
+        None,
+        &mut accumulated_text,
+        &mut chunk_index,
+    )
+    .await?;
+
+    let raw_text = outcome.assistant_text.trim().to_string();
+    let is_round_complete = raw_text.contains("[ROUND_COMPLETE]")
+        || matches!(kind, InterviewTurnKind::EndRound);
+    let cleaned_text = sanitize_interview_response(&raw_text);
+    let persisted_text = if cleaned_text.is_empty() {
+        raw_text.clone()
+    } else {
+        cleaned_text.clone()
+    };
+
+    if !persisted_text.trim().is_empty() {
+        storage::add_interview_message(
+            app,
+            storage::AddInterviewMessageInput {
+                round_id: refreshed_round.id.clone(),
+                role: "interviewer".into(),
+                content: persisted_text.clone(),
+                metadata: Some(json!({ "turnKind": interview_turn_kind_label(&kind) })),
+            },
+        )?;
+    }
+
+    if should_increment_interview_question_count(&kind) {
+        storage::increment_interview_round_question_count(app, &refreshed_round.id)?;
+    }
+
+    if is_round_complete {
+        let summary = extract_round_summary(&persisted_text);
+        let _ = storage::complete_interview_round(
+            app,
+            &refreshed_session.id,
+            &refreshed_round.id,
+            summary,
+            false,
+        )?;
+    }
+
+    emit_stream_event(
+        app,
+        DesktopAiStreamEvent {
+            request_id,
+            provider: config.provider,
+            model: config.model,
+            kind: DesktopAiStreamEventKind::Completed,
+            started_at_epoch_ms,
+            emitted_at_epoch_ms: now_epoch_ms()?,
+            finished_at_epoch_ms: Some(now_epoch_ms()?),
+            chunk_index: Some(chunk_index),
+            delta_text: None,
+            accumulated_text: Some(if cleaned_text.is_empty() {
+                accumulated_text
+            } else {
+                cleaned_text
+            }),
+            error_message: None,
+            tool_call: None,
+        },
+    )?;
+
+    Ok(())
+}
+
 fn resolve_provider_config(
     workspace_root: &std::path::Path,
     input: &StartAiPromptStreamInput,
 ) -> Result<ResolvedProviderConfig, String> {
+    resolve_provider_config_from_parts(
+        workspace_root,
+        Some(input.provider.as_str()),
+        input.model.as_deref(),
+        input.base_url.as_deref(),
+    )
+}
+
+fn resolve_provider_config_from_parts(
+    workspace_root: &std::path::Path,
+    provider_override: Option<&str>,
+    model_override: Option<&str>,
+    base_url_override: Option<&str>,
+) -> Result<ResolvedProviderConfig, String> {
     let settings_document = settings::load_or_initialize_settings(workspace_root)?;
-    let provider = if input.provider.trim().is_empty() {
+    let provider = if provider_override.unwrap_or_default().trim().is_empty() {
         settings_document.ai.default_provider.trim().to_string()
     } else {
-        normalize_supported_provider(&input.provider).ok_or_else(|| {
+        normalize_supported_provider(provider_override.unwrap_or_default()).ok_or_else(|| {
             format!(
                 "provider '{}' is not part of the desktop runtime contract",
-                input.provider.trim()
+                provider_override.unwrap_or_default().trim()
             )
         })?
     };
     let configured = settings_document.ai.provider_configs.get(&provider);
-    let base_url = input
-        .base_url
-        .as_ref()
+    let base_url = base_url_override
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
         .or_else(|| configured.map(|value| value.base_url.trim().to_string()))
         .unwrap_or_else(|| default_base_url_for_provider(&provider).to_string());
-    let model = input
-        .model
-        .as_ref()
+    let model = model_override
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
         .or_else(|| configured.map(|value| value.model.trim().to_string()))
@@ -1550,6 +1906,454 @@ fn truncate_text(value: &str, max_chars: usize) -> String {
 
     let truncated = trimmed.chars().take(max_chars).collect::<String>();
     format!("{truncated}...")
+}
+
+fn normalize_interview_locale(locale: Option<&str>) -> String {
+    match locale.unwrap_or("zh").trim().to_ascii_lowercase().as_str() {
+        "en" | "en-us" | "en-gb" => "en".into(),
+        _ => "zh".into(),
+    }
+}
+
+fn resolve_interview_round_for_turn(
+    session: &storage::InterviewSessionDetail,
+    requested_round_id: Option<&str>,
+) -> Result<storage::InterviewRoundDetail, String> {
+    if let Some(round_id) = requested_round_id.map(str::trim).filter(|value| !value.is_empty()) {
+        return session
+            .rounds
+            .iter()
+            .find(|round| round.id == round_id)
+            .cloned()
+            .ok_or_else(|| format!("interview round not found: {round_id}"));
+    }
+
+    session
+        .rounds
+        .iter()
+        .find(|round| round.sort_order == session.current_round)
+        .or_else(|| {
+            session
+                .rounds
+                .iter()
+                .find(|round| matches!(round.status.as_str(), "pending" | "in_progress"))
+        })
+        .cloned()
+        .ok_or_else(|| format!("interview session {} has no active round", session.id))
+}
+
+fn build_interview_input_message(
+    kind: &InterviewTurnKind,
+    message: Option<String>,
+    metadata: Option<Value>,
+    locale: &str,
+) -> Result<(String, String, Value), String> {
+    let merged_metadata = merge_metadata_objects(
+        metadata,
+        json!({ "turnKind": interview_turn_kind_label(kind) }),
+    )?;
+
+    match kind {
+        InterviewTurnKind::Start => Ok((
+            "system".into(),
+            if locale == "zh" {
+                "[系统指令] 开始本轮面试。请做一句自然的自我介绍，然后直接进入第一个问题。".into()
+            } else {
+                "[System] Start this interview round now. Give a natural one-line introduction, then move directly into the first question.".into()
+            },
+            merged_metadata,
+        )),
+        InterviewTurnKind::Answer => {
+            let content = message.unwrap_or_default().trim().to_string();
+            if content.is_empty() {
+                return Err("message is required when kind is 'answer'".into());
+            }
+            Ok(("candidate".into(), content, merged_metadata))
+        }
+        InterviewTurnKind::Hint => Ok(("system".into(), build_hint_prompt(locale), merged_metadata)),
+        InterviewTurnKind::Skip => Ok(("system".into(), build_skip_prompt(locale), merged_metadata)),
+        InterviewTurnKind::EndRound => Ok((
+            "system".into(),
+            build_end_round_prompt(locale),
+            merged_metadata,
+        )),
+    }
+}
+
+fn build_resume_context(
+    app: &AppHandle,
+    resume_id: Option<&str>,
+) -> Result<Option<String>, String> {
+    let Some(resume_id) = resume_id.map(str::trim).filter(|value| !value.is_empty()) else {
+        return Ok(None);
+    };
+
+    let Some(document) = storage::get_document(app, resume_id)? else {
+        return Ok(None);
+    };
+
+    let mut lines = Vec::new();
+    lines.push(format!("Resume Title: {}", document.title));
+    for section in document.sections {
+        if !section.visible {
+            continue;
+        }
+        let content = storage_section_content_for_prompt(&section.content_json);
+        if content.is_empty() {
+            continue;
+        }
+        lines.push(format!("## {}", section.title));
+        lines.push(content);
+    }
+
+    let joined = lines.join("\n\n").trim().to_string();
+    if joined.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(joined))
+    }
+}
+
+fn storage_section_content_for_prompt(content_json: &str) -> String {
+    let value = serde_json::from_str::<Value>(content_json).unwrap_or_else(|_| json!(content_json));
+    match value {
+        Value::String(text) => text.trim().to_string(),
+        other => serde_json::to_string_pretty(&other).unwrap_or_default(),
+    }
+}
+
+fn build_interview_messages(
+    session: &storage::InterviewSessionDetail,
+    round: &storage::InterviewRoundDetail,
+    resume_context: Option<String>,
+    locale: &str,
+) -> Vec<Value> {
+    let mut messages = Vec::new();
+    messages.push(json!({
+        "role": "system",
+        "content": build_interview_system_prompt(
+            &round.interviewer_config,
+            &session.job_description,
+            resume_context.as_deref(),
+            round.max_questions,
+            locale,
+        ),
+    }));
+
+    for message in &round.messages {
+        let role = match message.role.as_str() {
+            "interviewer" => "assistant",
+            "candidate" => "user",
+            "system" => "system",
+            _ => continue,
+        };
+        messages.push(json!({
+            "role": role,
+            "content": message.content,
+        }));
+    }
+
+    messages
+}
+
+fn build_interview_system_prompt(
+    interviewer_config: &Value,
+    job_description: &str,
+    resume_content: Option<&str>,
+    max_questions: i32,
+    locale: &str,
+) -> String {
+    let interviewer_name = interviewer_display_name(interviewer_config);
+    let interviewer_title = interviewer_config
+        .get("title")
+        .and_then(|value| value.as_str())
+        .unwrap_or(if locale == "zh" { "面试官" } else { "Interviewer" });
+    let bio = interviewer_config
+        .get("bio")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+    let personality = interviewer_config
+        .get("personality")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+    let style = interviewer_config
+        .get("style")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+    let focus_areas = interviewer_config
+        .get("focusAreas")
+        .and_then(|value| value.as_array())
+        .map(|values| {
+            values
+                .iter()
+                .filter_map(|value| value.as_str())
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let focus_line = if focus_areas.is_empty() {
+        if locale == "zh" {
+            "综合评估候选人与岗位的匹配度".to_string()
+        } else {
+            "Assess the candidate holistically against the role.".to_string()
+        }
+    } else if locale == "zh" {
+        focus_areas.join("、")
+    } else {
+        focus_areas.join(", ")
+    };
+
+    if locale == "zh" {
+        format!(
+            "# 角色设定\n\n你是{}，{}。\n\n## 个人背景\n{}\n\n## 性格特征\n{}\n\n## 提问风格\n{}\n\n---\n\n# 面试上下文\n\n## 本轮考察重点\n{}\n\n## 招聘岗位 JD\n{}\n\n## 候选人简历\n{}\n\n---\n\n# 面试执行规范\n\n- 每次只提出一个问题，等待候选人完整作答后再回应。\n- 先对候选人的回答做出简短反应，再继续追问或切换到下一个问题。\n- 本轮总共约 {} 个主题问题，节奏自然，不赶不拖。\n- 说话像一个真实、资深的面试官，不要像 AI 助手。\n- 当问题差不多结束时，给出一段简短、真实的本轮评价，并在最后单独一行写 [ROUND_COMPLETE]。\n- 不使用 emoji，不使用模板化寒暄，不质疑候选人提到的新技术是否存在。\n\n用中文交流。",
+            interviewer_name,
+            interviewer_title,
+            bio,
+            personality,
+            style,
+            focus_line,
+            job_description,
+            resume_content.unwrap_or("候选人未提供简历，请根据岗位要求展开面试。"),
+            max_questions
+        )
+    } else {
+        format!(
+            "# Role\n\nYou are {}, {}.\n\n## Background\n{}\n\n## Personality\n{}\n\n## Interviewing Style\n{}\n\n---\n\n# Interview Context\n\n## Focus Areas\n{}\n\n## Job Description\n{}\n\n## Candidate Resume\n{}\n\n---\n\n# Interview Conduct Guidelines\n\n- Ask one question at a time and wait for the candidate to finish.\n- Briefly react to each answer before following up or moving on.\n- Cover about {} topic questions this round at a natural pace.\n- Speak like an experienced human interviewer, not an AI assistant.\n- When the round is genuinely wrapping up, give a short, honest assessment and end with [ROUND_COMPLETE] on its own line.\n- Avoid emoji, avoid canned pleasantries, and never question whether a new technology mentioned by the candidate really exists.\n\nConduct the interview in English.",
+            interviewer_name,
+            interviewer_title,
+            bio,
+            personality,
+            style,
+            focus_line,
+            job_description,
+            resume_content.unwrap_or("No resume was provided. Assess the candidate against the role requirements directly."),
+            max_questions
+        )
+    }
+}
+
+fn interviewer_display_name(interviewer_config: &Value) -> String {
+    interviewer_config
+        .get("name")
+        .and_then(|value| value.as_str())
+        .map(ToString::to_string)
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| "Interviewer".into())
+}
+
+fn build_hint_prompt(locale: &str) -> String {
+    if locale == "zh" {
+        "[系统指令] 候选人请求引导。请用你的风格给出适度的方向性提示，点到为止，不要直接给完整答案。提示后把问题交还给候选人继续作答。".into()
+    } else {
+        "[System] The candidate is asking for guidance. Give a directional hint in your own style, but do not provide the full answer. After the hint, hand the question back to the candidate.".into()
+    }
+}
+
+fn build_skip_prompt(locale: &str) -> String {
+    if locale == "zh" {
+        "[系统指令] 候选人选择跳过当前问题。记下这个信号，然后自然地切换到下一个话题继续面试，不要刻意放大“跳过”这件事。".into()
+    } else {
+        "[System] The candidate chose to skip this question. Note it internally, then transition naturally to the next topic without dwelling on the skip.".into()
+    }
+}
+
+fn build_end_round_prompt(locale: &str) -> String {
+    if locale == "zh" {
+        "[系统指令] 候选人请求结束本轮面试。请给出简短的本轮总结评价，然后在最后单独一行写 [ROUND_COMPLETE]。".into()
+    } else {
+        "[System] The candidate wants to conclude this round. Give a brief round summary, then end with [ROUND_COMPLETE] on its own line.".into()
+    }
+}
+
+fn interview_turn_kind_label(kind: &InterviewTurnKind) -> &'static str {
+    match kind {
+        InterviewTurnKind::Start => "start",
+        InterviewTurnKind::Answer => "answer",
+        InterviewTurnKind::Hint => "hint",
+        InterviewTurnKind::Skip => "skip",
+        InterviewTurnKind::EndRound => "end_round",
+    }
+}
+
+fn should_increment_interview_question_count(kind: &InterviewTurnKind) -> bool {
+    matches!(
+        kind,
+        InterviewTurnKind::Start | InterviewTurnKind::Answer | InterviewTurnKind::Skip
+    )
+}
+
+fn sanitize_interview_response(text: &str) -> String {
+    text.replace("[ROUND_COMPLETE]", "").trim().to_string()
+}
+
+fn extract_round_summary(text: &str) -> Option<String> {
+    let cleaned = sanitize_interview_response(text);
+    if cleaned.is_empty() {
+        None
+    } else {
+        Some(cleaned)
+    }
+}
+
+fn merge_metadata_objects(base: Option<Value>, extra: Value) -> Result<Value, String> {
+    let mut merged = match base {
+        Some(Value::Object(map)) => map,
+        Some(_) => return Err("interview metadata must be a JSON object when provided".into()),
+        None => serde_json::Map::new(),
+    };
+
+    let Some(extra_map) = extra.as_object() else {
+        return Err("internal interview metadata patch must be a JSON object".into());
+    };
+    for (key, value) in extra_map {
+        merged.insert(key.clone(), value.clone());
+    }
+    Ok(Value::Object(merged))
+}
+
+fn build_interview_report_system_prompt(locale: &str) -> String {
+    if locale == "zh" {
+        "你是一位专业的人才评估专家。你会根据面试记录产出简洁、可信、结构化的 JSON 报告，只输出合法 JSON，不要附加解释。".into()
+    } else {
+        "You are an experienced talent assessment professional. Produce a concise, credible, structured JSON report from interview transcripts. Return valid JSON only.".into()
+    }
+}
+
+fn build_interview_report_user_prompt(
+    session: &storage::InterviewSessionDetail,
+    locale: &str,
+) -> String {
+    let transcript = session
+        .rounds
+        .iter()
+        .map(|round| {
+            json!({
+                "roundId": round.id,
+                "interviewerType": round.interviewer_type,
+                "interviewerName": interviewer_display_name(&round.interviewer_config),
+                "status": round.status,
+                "questionCount": round.question_count,
+                "messages": round.messages.iter().map(|message| {
+                    json!({
+                        "role": message.role,
+                        "content": message.content,
+                        "metadata": message.metadata,
+                    })
+                }).collect::<Vec<_>>(),
+            })
+        })
+        .collect::<Vec<_>>();
+    let transcript_json = serde_json::to_string_pretty(&transcript).unwrap_or_else(|_| "[]".into());
+    let job_title = session.job_title.clone().unwrap_or_default();
+
+    if locale == "zh" {
+        format!(
+            "请基于下面的桌面端面试记录生成一份基础报告。\n\n输出 JSON，字段且仅字段如下：\n{{\n  \"overallScore\": <0-100 整数>,\n  \"summary\": <2-4 句总结>,\n  \"overallFeedback\": <2-5 句整体反馈>,\n  \"improvementSuggestions\": [<字符串>, ...]\n}}\n\n要求：\n- 只基于给定记录做判断，不要虚构没有发生的细节。\n- `improvementSuggestions` 返回 3-6 条可执行建议。\n- 如果轮次不完整，也要如实反映在反馈里。\n\n岗位标题：{}\n岗位 JD：\n{}\n\n面试记录：\n{}",
+            job_title,
+            session.job_description,
+            transcript_json
+        )
+    } else {
+        format!(
+            "Generate a basic report from the following desktop interview transcript.\n\nReturn JSON with exactly these fields:\n{{\n  \"overallScore\": <integer 0-100>,\n  \"summary\": <2-4 sentence summary>,\n  \"overallFeedback\": <2-5 sentence overall feedback>,\n  \"improvementSuggestions\": [<string>, ...]\n}}\n\nRequirements:\n- Base the assessment only on the supplied transcript.\n- Return 3-6 actionable `improvementSuggestions` entries.\n- If the session is incomplete, say so honestly in the feedback.\n\nJob title: {}\nJob description:\n{}\n\nTranscript:\n{}",
+            job_title,
+            session.job_description,
+            transcript_json
+        )
+    }
+}
+
+async fn request_openai_json_completion(
+    client: &reqwest::Client,
+    endpoint: &str,
+    config: &ResolvedProviderConfig,
+    system_prompt: &str,
+    user_prompt: &str,
+) -> Result<Value, String> {
+    let response = client
+        .post(endpoint)
+        .bearer_auth(&config.api_key)
+        .header("Content-Type", "application/json")
+        .json(&json!({
+            "model": config.model,
+            "messages": [
+                { "role": "system", "content": system_prompt },
+                { "role": "user", "content": user_prompt }
+            ],
+            "temperature": 0.3,
+            "response_format": { "type": "json_object" }
+        }))
+        .send()
+        .await
+        .map_err(|error| format!("failed to call {endpoint}: {error}"))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "failed to read upstream error body".into());
+        return Err(format!("provider returned {status}: {body}"));
+    }
+
+    let body: Value = response
+        .json()
+        .await
+        .map_err(|error| format!("failed to parse provider JSON response: {error}"))?;
+    let content = extract_openai_completion_text(&body)
+        .ok_or_else(|| "provider completion response did not contain text content".to_string())?;
+    parse_json_value_from_text(&content)
+}
+
+fn extract_openai_completion_text(body: &Value) -> Option<String> {
+    let choice = body.get("choices")?.as_array()?.first()?;
+    let message = choice.get("message")?;
+    let content = message.get("content")?;
+
+    if let Some(text) = content.as_str() {
+        return Some(text.to_string());
+    }
+
+    let mut aggregated = String::new();
+    for item in content.as_array()? {
+        if let Some(text) = item.get("text").and_then(|value| value.as_str()) {
+            aggregated.push_str(text);
+        }
+    }
+
+    if aggregated.is_empty() {
+        None
+    } else {
+        Some(aggregated)
+    }
+}
+
+fn parse_json_value_from_text(content: &str) -> Result<Value, String> {
+    let trimmed = content.trim();
+    if let Ok(value) = serde_json::from_str::<Value>(trimmed) {
+        return Ok(value);
+    }
+
+    let without_fence = trimmed
+        .strip_prefix("```json")
+        .or_else(|| trimmed.strip_prefix("```"))
+        .map(|value| value.trim())
+        .unwrap_or(trimmed);
+    let without_fence = without_fence
+        .strip_suffix("```")
+        .map(|value| value.trim())
+        .unwrap_or(without_fence);
+    if let Ok(value) = serde_json::from_str::<Value>(without_fence) {
+        return Ok(value);
+    }
+
+    let start = trimmed
+        .find('{')
+        .ok_or_else(|| "response did not contain a JSON object".to_string())?;
+    let end = trimmed
+        .rfind('}')
+        .ok_or_else(|| "response did not contain a closing JSON object".to_string())?;
+    serde_json::from_str::<Value>(&trimmed[start..=end])
+        .map_err(|error| format!("failed to parse JSON object from completion text: {error}"))
 }
 
 fn emit_stream_event(app: &AppHandle, payload: DesktopAiStreamEvent) -> Result<(), String> {

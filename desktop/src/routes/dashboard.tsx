@@ -1,7 +1,16 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { createRoute, useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { Plus, Search, LayoutGrid, List, Sparkles, Upload, Camera } from "lucide-react";
+import {
+  Plus,
+  Search,
+  LayoutGrid,
+  List,
+  Sparkles,
+  Upload,
+  Camera,
+  MessageSquareQuote,
+} from "lucide-react";
 import { rootRoute } from "./root";
 import { ResumeGrid } from "../components/resume-grid";
 import { ResumeListItem } from "../components/resume-list-item";
@@ -187,6 +196,14 @@ function DashboardRoute() {
           >
             <Camera className="h-4 w-4" />
             <span className="hidden sm:inline">{t("dashboardLinkedinPhoto")}</span>
+          </button>
+          <button
+            type="button"
+            className="button button--secondary cursor-pointer gap-2"
+            onClick={() => navigate({ to: "/interview" })}
+          >
+            <MessageSquareQuote className="h-4 w-4" />
+            <span className="hidden sm:inline">{t("interview.dashboardCta")}</span>
           </button>
           <button
             type="button"
