@@ -33,6 +33,7 @@ interface ResumeStore {
   setTitle: (title: string) => void;
   updateTheme: (theme: Partial<ThemeConfig>) => void;
   save: () => Promise<void>;
+  _captureSnapshot: () => void;
   _scheduleSave: () => void;
   reset: () => void;
 }
